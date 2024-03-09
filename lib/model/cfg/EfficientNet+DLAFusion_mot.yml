@@ -1,0 +1,15 @@
+backbone:
+  model_name: 'EfficientNet'
+  cfg_name: 'default'
+  _description: ''
+neck:
+  model_name: 'DLA_Fusion'
+  cfg_name: 'default'
+  _description: ''
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+_description: ''
+max_classes_num: 1
+max_objects_num: 128

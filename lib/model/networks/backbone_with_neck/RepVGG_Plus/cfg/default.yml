@@ -1,0 +1,5 @@
+num_blocks: [8, 14, 24, 1]
+width_multiplier: [2.5, 2.5, 2.5, 5]
+deploy: false
+use_post_se: true
+use_checkpoint: false

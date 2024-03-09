@@ -1,0 +1,11 @@
+{
+    "root":"/media/jc/Extend/Library/Dataset",
+    "train":
+    {
+        "mot17":"./lib/dataset/data_path/AutoDataset.half"
+    },
+    "test":
+    {
+        "mot17":"./lib/dataset/data_path/AutoDataset.half"
+    }
+}

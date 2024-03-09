@@ -1,0 +1,15 @@
+{
+    "root":"/media/jc/Extend/Library/Dataset",
+    "train":
+    {
+        "custom":"./lib/dataset/data_path/mot20.train"
+    },
+    "test_emb":
+    {
+        "custom":"./lib/dataset/data_path/mot20.train"
+    },
+    "test":
+    {
+        "custom":"./lib/dataset/data_path/mot20.train"
+    }
+}

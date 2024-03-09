@@ -1,0 +1,10 @@
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+backbone_with_neck:
+  model_name: 'DLA_DCN'
+  cfg_name: 'default'
+  _description: ''
+_description: ''
+max_classes_num: 8

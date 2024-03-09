@@ -1,0 +1,13 @@
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+backbone:
+  _description: ''
+  cfg_name: 'Stream02'
+  model_name: 'ParNet_Mod'
+neck:
+  _description: ''
+  cfg_name: 'default'
+  model_name: 'DLA_Fusion'
+_description: ''

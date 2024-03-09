@@ -1,0 +1,4 @@
+base_name: 'dla34'
+pretrained: true
+down_ratio: 4
+last_level: 5

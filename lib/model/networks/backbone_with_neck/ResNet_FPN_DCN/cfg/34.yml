@@ -1,0 +1,2 @@
+block_class: BasicBlock
+layers: [3, 4, 6, 3]

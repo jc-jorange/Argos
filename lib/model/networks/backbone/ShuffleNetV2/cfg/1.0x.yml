@@ -1,0 +1,5 @@
+# model_size: 0.5x, 1.0x, 1.5x ,2.0x
+model_size: 1.0x
+out_stages: [2,3,4]
+# default activation is ReLU
+activation: LeakyReLU

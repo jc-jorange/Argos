@@ -1,0 +1,15 @@
+{
+    "root":"/media/jc/Extend/Library/Dataset",
+    "train":
+    {
+        "custom":"./lib/dataset/data_path/KITTI_Tracking2D.train"
+    },
+    "test_emb":
+    {
+        "custom":"./lib/dataset/data_path/KITTI_Tracking2D.train"
+    },
+    "test":
+    {
+        "custom":"./lib/dataset/data_path/KITTI_Tracking2D.train"
+    }
+}

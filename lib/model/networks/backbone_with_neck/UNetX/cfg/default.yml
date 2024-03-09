@@ -1,0 +1,5 @@
+inpCha: 3
+finOutCha: 64
+lstKer: [64, 64, 64, 128, 32]
+inpWidth: 100
+inpHeight: 100

@@ -1,0 +1,13 @@
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+backbone:
+  _description: ''
+  cfg_name: 'default'
+  model_name: 'DLA'
+neck:
+  _description: ''
+  cfg_name: 'default'
+  model_name: 'Ghost_PAN'
+_description: ''

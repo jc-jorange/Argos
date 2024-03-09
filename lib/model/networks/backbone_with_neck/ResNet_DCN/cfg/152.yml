@@ -1,0 +1,3 @@
+block_class: Bottleneck
+layers: [3, 8, 36, 3]
+base_model: resnet152

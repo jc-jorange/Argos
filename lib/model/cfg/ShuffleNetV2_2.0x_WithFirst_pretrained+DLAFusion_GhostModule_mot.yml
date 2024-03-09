@@ -1,0 +1,13 @@
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+backbone:
+  _description: ''
+  cfg_name: '2.0x_WithFirst_pretrained'
+  model_name: 'ShuffleNetV2'
+neck:
+  _description: ''
+  cfg_name: 'with_GhostModule'
+  model_name: 'DLA_Fusion'
+_description: ''

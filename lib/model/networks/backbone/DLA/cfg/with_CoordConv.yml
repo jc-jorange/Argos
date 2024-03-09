@@ -1,0 +1,3 @@
+name: 'dla34'
+pretrained: True
+use_coordconv: True

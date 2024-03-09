@@ -1,0 +1,16 @@
+head_conv: 256
+reid_dim: 128
+loss_cfg:
+  mse_loss: false
+  reg_loss: 'l1'
+  hm_weight: 1
+  off_weight: 1
+  wh_weight: 0.1
+  id_loss: 'ce'
+  id_weight: 1
+  norm_wh: false
+  dense_wh: false
+  cat_spec_wh: false
+  reg_offset: true
+
+  loss_stats: ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']

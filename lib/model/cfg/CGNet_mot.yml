@@ -1,0 +1,9 @@
+head:
+  model_name: 'FairMOT'
+  cfg_name: 'default'
+  _description: ''
+backbone_with_neck:
+  model_name: 'CGNet'
+  cfg_name: 'default'
+  _description: ''
+_description: ''
