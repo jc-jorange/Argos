@@ -1,13 +1,11 @@
 import os
 import time
-from collections import deque
 from multiprocessing import Process
-import lib.multiprocess.SharedMemory as mp_utils
+import lib.multiprocess.SharedMemory as SHM
 import torch
-from lib.utils.logger import logger
-from socket import *
-import struct
 
+from lib.tracker.utils.utils import *
+from lib.tracker.utils import write_result as wr, visualization as vis
 
 class PathPredictProcess(Process):
     m_cha = [
@@ -22,7 +20,7 @@ class PathPredictProcess(Process):
                  opt,
                  pipe_send,
                  pipe_read,
-                 shm
+                 shm: SHM.SharedMemory
                  ):
         super().__init__()
         self.idx = idx

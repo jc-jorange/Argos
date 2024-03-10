@@ -20,10 +20,10 @@ from lib.multiprocess.MP_Tracker import Tracker_Process
 from lib.multiprocess.MP_ImageReceiver import ImageReceiver
 from lib.multiprocess.MP_PathPredict import PathPredictProcess
 import lib.multiprocess.SharedMemory as SHM
-import lib.multiprocess.MP_PostProcess as MP_Post
+import lib.multiprocess.MP_MultiCameraPredict as MP_Post
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-NAME_shm_img = mp_utils.NAME_shm_img
+NAME_shm_img = SHM.NAME_shm_img
 
 def train(opt):
     torch.manual_seed(opt.seed)
