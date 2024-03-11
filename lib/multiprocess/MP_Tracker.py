@@ -5,6 +5,7 @@ import numpy
 from collections import defaultdict
 from multiprocessing import Process
 
+import lib.multiprocess.Shared as Sh
 from lib.tracker.multitracker import MCJDETracker
 from lib.tracker.utils.utils import *
 from lib.tracker.utils import write_result as wr, visualization as vis
@@ -17,30 +18,30 @@ class Tracker_Process(Process):
     def __init__(self,
                  idx: int,
                  opt,
-                 result_root: str,
-                 pipe_tracker_send,
-                 pipe_ImageReceiver_out,
+                 shared_image_dict: Sh.SharedDict,
                  frame_rate=24):
         super().__init__()
         self.name = 'Argus-SubProcess-Tracker_' + str(idx)
         self.idx = idx
         self.opt = opt
-        self.result_root = result_root
-        self.pipe_tracker_send = pipe_tracker_send
-        self.pipe_ImageReceiver_out = pipe_ImageReceiver_out
         self.frame_rate = frame_rate
 
-        self.data_loader = LoadData(self.idx, opt.input_mode, opt.input_path[idx], self.pipe_ImageReceiver_out)
+        self.result_root = os.path.join(opt.save_dir, 'camera_' + str(idx+1))
+        mkdir_if_missing(self.result_root)
 
-        self.result_file_name = os.path.join(result_root, 'text_result.txt')
+        self.shared_image_dict = shared_image_dict
+
+        self.data_loader = LoadData(self.idx, opt.input_mode, opt.input_path[idx], self.shared_image_dict)
+
+        self.result_file_name = os.path.join(self.result_root, 'text_result.txt')
         self.frame_dir = None if opt.output_format == 'text' \
-            else os.path.join(result_root, 'frame')
+            else os.path.join(self.result_root, 'frame')
         if self.frame_dir:
             mkdir_if_missing(self.frame_dir)
 
-        self.fps_track_avg = 0
+        self.fps_neuralnetwork_avg = 0
         self.fps_loop_avg = 0
-        self.fps_track_current = 0
+        self.fps_neuralnetwork_current = 0
         self.fps_loop_current = 0
 
         self.logger = None
@@ -68,7 +69,7 @@ class Tracker_Process(Process):
         frame_id = 0  # frame index
         timer_loop.tic()
 
-        torch.cuda.set_per_process_memory_fraction(0.5, 0)
+        # torch.cuda.set_per_process_memory_fraction(0.5, 0)
 
         for path, img, img0 in self.data_loader:
             # loop timer end record
@@ -115,22 +116,9 @@ class Tracker_Process(Process):
                                                  online_scores_dict[cls_id]))
                         current_result[cls_id, t_id] = xywh
 
-            self.pipe_tracker_send.send(current_result)
-            # # collect result
-            # current_result = {cls_id: [] for cls_id in range(info_data.classes_max_num)}
-            # for cls_id in range(info_data.classes_max_num):
-            #     results_dict[cls_id].append((frame_id + 1,
-            #                                  online_tlwhs_dict[cls_id],
-            #                                  online_ids_dict[cls_id],
-            #                                  online_scores_dict[cls_id]))
-            #
-            #     current_result[cls_id].append((frame_id + 1,
-            #                                    online_tlwhs_dict[cls_id],
-            #                                    online_ids_dict[cls_id],
-            #                                    online_scores_dict[cls_id]))
-
             self.fps_loop_avg = frame_id / max(1e-5, timer_loop.total_time)
             self.fps_loop_current = 1.0 / max(1e-5, timer_loop.diff)
+
             # post
             # draw track/detection
             if frame_id > 0:
@@ -150,8 +138,8 @@ class Tracker_Process(Process):
             # update frame id
             frame_id += 1
 
-            self.fps_track_avg = frame_id / max(1e-5, timer_track.total_time)
-            self.fps_track_current = 1.0 / max(1e-5, timer_track.diff)
+            self.fps_neuralnetwork_avg = frame_id / max(1e-5, timer_track.total_time)
+            self.fps_neuralnetwork_current = 1.0 / max(1e-5, timer_track.diff)
             if frame_id % 10 == 0 and frame_id != 0:
                 logger.logger_dict[os.getpid()].info(
                     'Processing frame {}: {:.2f} loop average fps, {:.2f} loop current fps; '
@@ -159,13 +147,13 @@ class Tracker_Process(Process):
                         frame_id,
                         self.fps_loop_avg,
                         self.fps_loop_current,
-                        self.fps_track_avg,
-                        self.fps_track_current,
+                        self.fps_neuralnetwork_avg,
+                        self.fps_neuralnetwork_current,
                     )
                 )
             logger.logger_dict[os.getpid()].debug(
                 'Processing frame {}: {:.2f} track current fps, {} s'.format(
-                    frame_id, self.fps_track_current, 1.0 / self.fps_track_current
+                    frame_id, self.fps_neuralnetwork_current, 1.0 / self.fps_neuralnetwork_current
                 )
             )
             logger.logger_dict[os.getpid()].debug(
@@ -178,7 +166,7 @@ class Tracker_Process(Process):
         self.logger.info('Final loop time {}'.format(timer_loop.total_time))
         self.logger.info('Final loop FPS {}'.format(self.fps_loop_avg))
         self.logger.info('Final inference time {}'.format(timer_track.total_time))
-        self.logger.info('Final inference FPS {}'.format(self.fps_track_avg))
+        self.logger.info('Final inference FPS {}'.format(self.fps_neuralnetwork_avg))
         # write track/detection results to text
         wr.write_results_to_text(self.result_file_name,
                                  results_dict,

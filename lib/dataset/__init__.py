@@ -18,7 +18,8 @@ from lib.utils.image import gaussian_radius, draw_umich_gaussian
 from lib.utils.utils import xyxy2xywh
 from lib.model.model_config import E_arch_position, E_model_part_input_info
 from lib.dataset.utils.utils import create_gamma_img, clear_socket_buffer
-import lib.multiprocess.SharedMemory as mp_utils
+import lib.multiprocess.Shared as Sh
+from  lib.multiprocess.MP_ImageReceiver import E_ImageInfo
 
 def letterbox(img,
               height=608,
@@ -52,7 +53,7 @@ def letterbox(img,
 
 # for inference
 class LoadData:
-    def __init__(self, idx, data_type, path, pipe, img_size=(1088, 608)):
+    def __init__(self, idx, data_type, path, shared_image_dict: Sh.SharedDict, img_size=(1088, 608)):
         """
         Load image data.
 
@@ -66,7 +67,8 @@ class LoadData:
         self.logger = logger.logger_dict[os.getpid()]
         self.last_process_time = -1
         self.idx = idx
-        self.pipe_ImageReceiver_out = pipe
+        # self.pipe_ImageReceiver_out = pipe
+        self.shared_image_dict = shared_image_dict
 
         if self.data_type == 'Image':
             if type(path) == str:
@@ -113,9 +115,8 @@ class LoadData:
                 raise StopIteration
         elif self.data_type == 'Address':
             try:
-                shm_tmp, img_0 = mp_utils.read_from_shm(mp_utils.NAME_shm_img + str(self.idx), (200,320,3), np.uint8)
-                shm_tmp.close()
-            except FileNotFoundError:
+                self.shared_image_dict.read_data(E_ImageInfo.Data)
+            except KeyError:
                 raise StopIteration
 
         return self.read_image(self.count)

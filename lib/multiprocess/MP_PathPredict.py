@@ -1,9 +1,8 @@
-import os
 import time
 from multiprocessing import Process
-import lib.multiprocess.SharedMemory as SHM
-import torch
 
+from lib.predictor.spline.hermite_spline import HermiteSpline
+import lib.multiprocess.Shared as Sh
 from lib.tracker.utils.utils import *
 from lib.tracker.utils import write_result as wr, visualization as vis
 
@@ -18,15 +17,11 @@ class PathPredictProcess(Process):
     def __init__(self,
                  idx: int,
                  opt,
-                 pipe_send,
-                 pipe_read,
-                 shm: SHM.SharedMemory
+                 shm: Sh.SharedDict
                  ):
         super().__init__()
         self.idx = idx
         self.opt = opt
-        self.pipe_Tracker_send = pipe_send
-        self.pipe_Tracker_read = pipe_read
         self.shm = shm
 
         self.results_list = []

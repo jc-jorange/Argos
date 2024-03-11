@@ -4,7 +4,6 @@ from multiprocessing import Pipe, Lock, Value, shared_memory
 import os
 import torch
 import json
-import numpy as np
 
 import torch.utils.data
 from torchvision.transforms import transforms as T
@@ -19,11 +18,11 @@ from lib.utils.utils import select_device
 from lib.multiprocess.MP_Tracker import Tracker_Process
 from lib.multiprocess.MP_ImageReceiver import ImageReceiver
 from lib.multiprocess.MP_PathPredict import PathPredictProcess
-import lib.multiprocess.SharedMemory as SHM
+import lib.multiprocess.Shared as Sh
 import lib.multiprocess.MP_MultiCameraPredict as MP_Post
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-NAME_shm_img = SHM.NAME_shm_img
+NAME_shm_img = Sh.NAME_shm_img
 
 def train(opt):
     torch.manual_seed(opt.seed)
@@ -161,77 +160,56 @@ def track(opt):
         main_logger.info('  %s: %s' % (str(k), str(v)))
 
     sub_processor_num = len(opt.input_path)
-    mp_trackers_dict = {}
-    pipe_track_send_dict = {}
-    pipe_track_read_dict = {}
 
     mp_image_receiver_dict = {}
-    pipe_ImgRecv_send_dict = {}
-    pipe_ImgRecv_read_dict = {}
-    shm_image_dict = {}
+    mp_trackers_dict = {}
+    mp_path_predictor_dict = {}
 
-    mp_pathpredict_dict = {}
-    pipe_path_send_dict = {}
-    pipe_path_read_dict = {}
+    sd_image_dict = {}
+    sd_predict_dict = {}
 
     main_logger.info('Total {} cameras are loaded'.format(sub_processor_num))
 
-    main_logger.info('-' * 5 + 'Setting main post processor...' + '-' * 5 )
-
     for model_index in range(sub_processor_num):
-        indi_dir = os.path.join(result_dir, 'camera_raw_' + str(model_index+1))
-        mkdir_if_missing(indi_dir)
-
         if opt.input_mode == 'Address':
             main_logger.info('-' * 5 + 'Setting Image Receiver Sub-Processor {}'.format(model_index))
-            pipe_ImgRecv_read_dict[model_index], pipe_ImgRecv_send_dict[model_index] = Pipe(duplex=False)
-            ImgRecv = ImageReceiver(
-                model_index, opt, indi_dir, pipe_ImgRecv_send_dict[model_index], pipe_ImgRecv_read_dict[model_index]
-            )
-            mp_image_receiver_dict[model_index] = ImgRecv
-            main_logger.info('-' * 5 + 'Start Image Receiver Sub-Process No.{}'.format(model_index))
-            ImgRecv.start()
 
-    if opt.input_mode == 'Address':
-        bReceiveAll = False
-        while not bReceiveAll:
-            bReceiveEach = False
-            for i, p in pipe_ImgRecv_read_dict.items():
-                bReceiveEach = p.poll()
-                if bReceiveEach:
-                    img_initial = p.recv()
-                    shm_image_dict[i] = SHM.SharedMemory(NAME_shm_img + str(i), img_initial)
-            bReceiveAll = bReceiveEach
+            shared_dict_image = Sh.SharedDict()
+            sd_image_dict[model_index] = shared_dict_image
 
-    for model_index in range(sub_processor_num):
-        indi_dir = os.path.join(result_dir, 'camera_' + str(model_index+1))
-        mkdir_if_missing(indi_dir)
+            img_receiver = ImageReceiver(model_index, opt, shared_dict_image)
+            mp_image_receiver_dict[model_index] = img_receiver
 
         main_logger.info('-' * 5 + 'Setting Tracker Sub-Processor {}'.format(model_index))
-        pipe_track_read_dict[model_index], pipe_track_send_dict[model_index] = Pipe(duplex=False)
-        tracker = Tracker_Process(model_index, opt, indi_dir, pipe_track_send_dict[model_index], pipe_track_read_dict[model_index])
+
+        if sd_image_dict:
+            shared_dict_image = sd_image_dict[model_index]
+        else:
+            shared_dict_image = Sh.SharedDict()
+            sd_image_dict[model_index] = shared_dict_image
+
+        tracker = Tracker_Process(model_index, opt, shared_dict_image)
         mp_trackers_dict[model_index] = tracker
 
         main_logger.info('-' * 5 + 'Setting Predictor Sub-Processor {}'.format(model_index))
-        pipe_path_read_dict[model_index], pipe_path_send_dict[model_index] = Pipe(duplex=False)
-        path_predictor = PathPredictProcess(model_index, opt, pipe_track_send_dict[model_index], pipe_track_read_dict[model_index], shm_image_dict[model_index])
-        mp_pathpredict_dict[model_index] = path_predictor
-        path_predictor.start()
 
-    for i, p in pipe_ImgRecv_send_dict.items():
+        shared_dict_predict = Sh.SharedDict()
+        sd_predict_dict[model_index] = shared_dict_predict
+
+        path_predictor = PathPredictProcess(model_index, opt,shared_dict_predict)
+        mp_path_predictor_dict[model_index] = path_predictor
+
+    for i, p in mp_image_receiver_dict.items():
         main_logger.info('-' * 5 + 'Start Image Receiver Sub-Process No.{}'.format(i))
-        p.send(True)
+        p.start()
 
     for i, p in mp_trackers_dict.items():
         main_logger.info('-' * 5 + 'Start Tracker Sub-Process No.{}'.format(i))
         p.start()
 
-    while shm_image_dict:
-        for i, pipe in pipe_ImgRecv_read_dict.items():
-            if pipe.poll():
-                shm_image_dict[i].shm.close()
-                shm_image_dict[i].shm.unlink()
-                shm_image_dict.pop(i)
+    for i, p in mp_path_predictor_dict.items():
+        main_logger.info('-' * 5 + 'Start Predictor Sub-Process No.{}'.format(i))
+        p.start()
 
     bCheckTracker = True
     while bCheckTracker:
