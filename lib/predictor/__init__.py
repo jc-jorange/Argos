@@ -1,13 +1,12 @@
 import numpy as np
 import time
-import copy
 
 S_point = np.ndarray  # shape:[class, id, (xy)]
 
 
 class BasePredictor:
 
-    def __init__(self, max_step=16, max_distance=16, *args, **kwargs) -> None:
+    def __init__(self, max_step=300, max_distance=50, **kwargs) -> None:
         self.time_0 = 0.0
         self.dt_base = 1.0
         self.p0_list = []
@@ -17,61 +16,87 @@ class BasePredictor:
         self.max_step = max_step
         self.max_distance = max_distance
 
-    def cull(self, point: S_point, t: float) -> S_point:
+    def filter_close_track(self, point: S_point, t: float) -> S_point:
         predict_result = self.get_predicted_position(t)
-        if not predict_result:
+        try:
+            if predict_result.any():
+                predict_result = predict_result.numpy()
+        except AttributeError:
             predict_result = np.zeros(point.shape)
-        both = np.multiply(point, predict_result)
-        m_p = np.where(both, 0, point)
-        m_t = np.where(both, 0, predict_result)
+        both = point * predict_result
+        both = np.where(both > 0, 1, 0)
+        m_track = np.where(both, 0, point)
+        m_predict = np.where(both, 0, predict_result)
 
-        valid_p = np.nonzero(m_p)
-        valid_t = np.nonzero(m_t)
+        checked_predict = []
+        dict_reid = {}  # {(origin_track_class&id) : (predict_class&id)}
 
-        paired_p = ([], [])
-        paired_t = ([], [])
+        classandid_track = np.nonzero(m_track)
+        classandid_predict = np.nonzero(m_predict)
 
-        copy_valid_p = copy.deepcopy(valid_p)
-        for i_p in range(len(copy_valid_p[0])):
-            class_p = copy_valid_p[0][i_p]
-            id_p = copy_valid_p[1][i_p]
-            each_p = m_p[class_p, id_p]
-            copy_valid_t = copy.deepcopy(valid_t)
-            for i_t in range(len(copy_valid_t[0])):
-                class_t = copy_valid_t[0][i_t]
-                id_t = copy_valid_t[1][i_t]
-                each_t = m_t[class_t, id_t]
+        for i_t in range(len(classandid_track[0])):
+            class_t = classandid_track[0][i_t]
+            id_t = classandid_track[1][i_t]
+            coord_t = m_track[class_t, id_t]
+            mm = 2 ** 16
+            i_checked = -1
+            for i_p in range(len(classandid_predict[0])):
+                class_p = classandid_predict[0][i_p]
+                id_p = classandid_predict[1][i_p]
 
-                dist = np.linalg.norm(each_t - each_p)
-                if dist <= self.max_distance:
-                    paired_t[0].insert(i_t, valid_t[0][i_t])
-                    paired_t[1][i_t] = valid_t[1].pop(i_t)
+                try:
+                    if (class_p, id_p) in checked_predict:
+                        continue
+                except KeyError:
+                    pass
 
-                    paired_p[0][i_p] = valid_p[0].pop(i_p)
-                    paired_p[1][i_p] = valid_p[1].pop(i_p)
+                coord_p = m_predict[class_p, id_p]
 
-                    break
+                dist = np.linalg.norm(coord_p - coord_t)
 
-        new_trak = valid_p
-        count_trak = valid_t
+                if dist <= self.max_distance and dist < mm:
+                    dict_reid[(class_t, id_t)] = (class_p, id_p)
+                    i_checked = i_p
+                    mm = dist
+            if i_checked >= 0:
+                class_checked = classandid_predict[0][i_checked]
+                id_checked = classandid_predict[1][i_checked]
+                checked_predict.append((class_checked, id_checked))
 
-        return new_trak, count_trak, paired_p, paired_t
+        return dict_reid
 
-    def set_new_base(self, point: S_point) -> None:
-        if not self.track_counter:
-            self.track_counter = np.where(point[:, :, 0] > 0, 0, -1)
-        # self.track_counter = self.track_counter + (point[:, :, 0] > 0)
+    def set_new_base(self, point: S_point) -> S_point:
+        # try:
+        #     if self.track_counter.any():
+        #         self.track_counter -= 1
+        # except AttributeError:
+        #     self.track_counter = np.where(point> 0, self.max_step + 1, 1)
+
         t_current = time.perf_counter()
-        self.dt_base = t_current - self.time_0
-        new_trak, count_trak, paired_p, paired_t = self.cull(point, t_current)
-        self.track_counter[new_trak] = 1
-        self.track_counter[count_trak] += 1
-        point[paired_t] = point[paired_p]
-        point[paired_p] = 0
+        # self.dt_base = t_current - self.time_0
+
+        predict_result = self.get_predicted_position(t_current).numpy()
+
+        reid_track_dict = self.filter_close_track(point, t_current)
+
+        for origin_track_id, new_track_id in reid_track_dict.items():
+            point[new_track_id] = point[origin_track_id]
+            point[origin_track_id] = 0
+        # self.track_counter[np.nonzero(point)] = self.max_step
+
+        both = point * predict_result
+        both = np.where(both > 0, 1, 0)
+        # m_track = np.where(both, 0, point)
+        m_predict = np.where(both, 0, predict_result)
+        point = point + m_predict
 
         self.time_0 = t_current
+        self.p0_list.pop(0)
+        self.time_list.pop(0)
         self.p0_list.append(point)
         self.time_list.append(t_current)
+
+        return predict_result
 
     def clear(self) -> None:
         self.time_0 = 0.0

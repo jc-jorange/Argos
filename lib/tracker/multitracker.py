@@ -2,7 +2,7 @@ from collections import deque
 
 from collections import defaultdict
 
-from lib.utils.logger import logger
+from lib.utils.logger import ALL_LoggerContainer
 from lib.model import BaseModel, load_model
 from lib.model.decode import mot_decode
 from lib.model.utils import _tranpose_and_gather_feat
@@ -261,7 +261,7 @@ class MCJDETracker(object):
         self.opt = opt
 
         # ----- init model
-        logger.logger_dict[os.getpid()].info('Creating model...')
+        ALL_LoggerContainer.logger_dict[os.getpid()].info('Creating model...')
         self.model = BaseModel(opt)
         self.info_data = self.model.info_data
         self.model = load_model(self.model, opt.load_model)  # load specified checkpoint
@@ -275,7 +275,7 @@ class MCJDETracker(object):
 
         self.frame_id = 0
         self.det_thresh = opt.conf_thres
-        self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)  # int(frame_rate / 30.0 * opt.track_buffer)
+        self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)
         self.max_time_lost = self.buffer_size
         self.max_per_image = self.model.objects_max_num  # max objects per image
         self.mean = np.array(self.info_data.mean, dtype=np.float32).reshape(1, 1, 3)
@@ -581,14 +581,14 @@ class MCJDETracker(object):
             # get scores of lost tracks
             output_tracks_dict[cls_id] = [track for track in self.tracked_tracks_dict[cls_id] if track.is_activated]
 
-            logger.logger_dict[os.getpid()].debug('===========Frame {}=========='.format(self.frame_id))
-            logger.logger_dict[os.getpid()].debug('Activated: {}'.format(
+            ALL_LoggerContainer.logger_dict[os.getpid()].debug('===========Frame {}=========='.format(self.frame_id))
+            ALL_LoggerContainer.logger_dict[os.getpid()].debug('Activated: {}'.format(
                 [track.track_id for track in activated_tracks_dict[cls_id]]))
-            logger.logger_dict[os.getpid()].debug('Refind: {}'.format(
+            ALL_LoggerContainer.logger_dict[os.getpid()].debug('Refind: {}'.format(
                 [track.track_id for track in refined_tracks_dict[cls_id]]))
-            logger.logger_dict[os.getpid()].debug('Lost: {}'.format(
+            ALL_LoggerContainer.logger_dict[os.getpid()].debug('Lost: {}'.format(
                 [track.track_id for track in lost_tracks_dict[cls_id]]))
-            logger.logger_dict[os.getpid()].debug('Removed: {}'.format(
+            ALL_LoggerContainer.logger_dict[os.getpid()].debug('Removed: {}'.format(
                 [track.track_id for track in removed_tracks_dict[cls_id]]))
 
         time_parse_end = datetime.datetime.now()

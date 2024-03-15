@@ -1,6 +1,15 @@
-import numpy as np
 from multiprocessing import shared_memory
 import multiprocessing as mp
+import numpy as np
+from enum import Enum, unique
+
+
+@unique
+class E_SharedDictType(Enum):
+    Image = 1
+    Track = 2
+    Predict = 3
+
 
 NAME_shm_img = 'RecvImg_'
 
@@ -42,4 +51,14 @@ class SharedDict:
         self.mp_dict[key] = data
 
     def read_data(self, key: any) -> any:
+        try:
+            return self.mp_dict[key]
+        except KeyError:
+            return None
+
+    def pop_data(self, key: any) -> any:
+        # try:
+        #     return self.mp_dict.pop(key)
+        # except KeyError:
+        #     return None
         return self.mp_dict[key]

@@ -13,7 +13,7 @@ import numpy as np
 from socket import *
 
 from collections import OrderedDict, defaultdict
-from lib.utils.logger import logger
+from lib.utils.logger import ALL_LoggerContainer
 from lib.utils.image import gaussian_radius, draw_umich_gaussian
 from lib.utils.utils import xyxy2xywh
 from lib.model.model_config import E_arch_position, E_model_part_input_info
@@ -64,7 +64,7 @@ class LoadData:
         self.frame_rate = 10  # no actual meaning here
         self.data_type = data_type
         self.path = path
-        self.logger = logger.logger_dict[os.getpid()]
+        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
         self.last_process_time = -1
         self.idx = idx
         # self.pipe_ImageReceiver_out = pipe
@@ -147,7 +147,7 @@ class LoadData:
 
         elif self.data_type == 'Address':
             img_path = 'Current frame'
-            self.shm, img_ad = mp_utils.read_from_shm(mp_utils.NAME_shm_img + str(self.idx), (200,320,3), np.uint8)
+            self.shm, img_ad = Sh.read_from_shm(Sh.NAME_shm_img + str(self.idx), (200,320,3), np.uint8)
             img_0 = np.ascontiguousarray(np.copy(img_ad))
 
         end_time = time.perf_counter()
@@ -459,7 +459,7 @@ class TrainingDataset(LoadImagesAndLabels):
         :param augment:
         :param transforms: Image data transformations, default is transforms.ToTensor
         """
-        self.logger = logger.logger_dict[os.getpid()]
+        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
         self.opt = opt
         self.info_data = info_data
         self.img_files = OrderedDict()

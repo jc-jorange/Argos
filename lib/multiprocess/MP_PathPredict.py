@@ -1,105 +1,50 @@
 import time
-from multiprocessing import Process
 
+from ..multiprocess import BaseProcess, E_SharedDictType, E_Multiprocess
+from lib.multiprocess.MP_Tracker import E_TrackInfo
+from lib.multiprocess.MP_ImageReceiver import E_ImageInfo
 from lib.predictor.spline.hermite_spline import HermiteSpline
 import lib.multiprocess.Shared as Sh
 from lib.tracker.utils.utils import *
 from lib.tracker.utils import write_result as wr, visualization as vis
 
-class PathPredictProcess(Process):
-    m_cha = [
-            [1., 0., 0., 0.],
-            [0., 1., 0., 0.],
-            [-3., -2., 3., -1.],
-            [2., 1., -2., 1.],
-        ]
-
+class PathPredictProcess(BaseProcess):
+    prefix = 'Argus-SubProcess-PathPredictProcess_'
     def __init__(self,
-                 idx: int,
-                 opt,
-                 shm: Sh.SharedDict
+                 *args
                  ):
-        super().__init__()
-        self.idx = idx
-        self.opt = opt
-        self.shm = shm
+        super().__init__(*args)
+        self.making_process_main_save_dir('camera_predict_')
 
-        self.results_list = []
-        self.time_list = []
+        self.track_result = None
+        self.predict_result = None
 
-        # self.m_cha = torch.tensor(self.m_cha).to(self.opt.device).half()
-        self.m_cha = torch.tensor(self.m_cha)
-        self.m_point = None
-
-        self.t0 = time.perf_counter()
-        self.dt_base = 0.00001
-        self.bRest = True
-
-    def calculate_path(self, t, m_cha, m_point):
-        m_t = [1, t, t ** 2, t ** 3]
-        # m_t = torch.tensor(m_t).to(self.opt.device).half()
-        m_t = torch.tensor(m_t)
-
-        return m_t@m_cha@m_point
-
-    def process_result(self):
-        r0 = torch.tensor(self.results_list[-3])
-        r1 = torch.tensor(self.results_list[-2])
-        r2 = torch.tensor(self.results_list[-1])
-
-        mask = torch.where((r0 * r1 * r2) > 0.0001, 1., 0.)
-
-        p0 = r0 * mask
-        p1 = r1 * mask
-        p2 = r2 * mask
-
-        d_p1 = p1 - p0
-        d_p2 = p2 - p1
-
-        d_t1 = self.time_list[-2] - self.time_list[-3]
-        d_t2 = self.time_list[-1] - self.time_list[-2]
-        self.dt_base = d_t2
-
-        v1 = d_p1 / d_t1
-        v2 = d_p2 / d_t2
-
-        p1 = p1.unsqueeze(-2)
-        p2 = p2.unsqueeze(-2)
-        v1 = v1.unsqueeze(-2)
-        v2 = v2.unsqueeze(-2)
-
-        return torch.cat((p1,v1,p2,v2), -2).float()
-
-    def reset(self):
-        self.t0 = time.perf_counter()
-        t2 = self.t0
-        if len(self.results_list) >= 3:
-            self.results_list.pop(0)
-        while len(self.results_list) < 3:
-            result = self.pipe_Tracker_read.recv()[:, :, :2]
-            self.results_list.append(result)
-            recv_time = time.perf_counter()
-            self.time_list.append(recv_time)
-        # self.m_point = self.prcess_result().to(self.opt.device).half()
-        self.m_point = self.process_result()
-
-    def predict(self):
-        t1 = time.perf_counter()
-        dt = t1 - self.t0
-        scaled_dt = dt / self.dt_base
-        p_predict = self.calculate_path(scaled_dt, self.m_cha, self.m_point)
-        NoneZeroIndex = torch.nonzero(p_predict)
+        self.predictor = HermiteSpline()
 
     def run(self):
-        t2 = 0
+        super(PathPredictProcess, self).run()
+        t1 = time.perf_counter()
+        i = 0
+        self.predictor.time_0 = t1
         while True:
-            self.bRest = self.pipe_Tracker_read.poll()
-            if self.bRest:
-                self.reset()
+            t2 = time.perf_counter()
+            self.track_result = self.container_shared_dict[E_SharedDictType.Track][self.idx].read_data(E_TrackInfo.Result)
+            if isinstance(self.track_result, np.ndarray):
+                self.predict_result = self.predictor.set_new_base(self.track_result)
+            else:
+                self.predict_result = self.predictor.get_predicted_position(t2)
 
-            if len(self.results_list) >= 3:
-                t1 = time.perf_counter()
-                self.predict()
-                dt_each = t1 - t2
-                t2 = time.perf_counter()
+            image = self.container_shared_dict[E_SharedDictType.Image][self.idx].read_data(E_ImageInfo.Data)
 
+            if isinstance(self.predict_result, np.ndarray) and isinstance(image, np.ndarray):
+                for i_c, e_c in enumerate(self.predict_result):
+                    for i_id, e_id in enumerate(e_c):
+                        if e_id[0]>0 and e_id[2]>0:
+                            e_id = e_id.tolist()
+                            cv2.circle(image, (int(e_id[0]), int(e_id[1])), 5, (0, 0, 255), -1)
+                            cv2.putText(image, 'class:{}, id:{}'.format(i_c, i_id),
+                                        (int(e_id[0])+10, int(e_id[1])-10), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.65, (0,0,255),2)
+
+                i += 1
+                cv2.imwrite(os.path.join(self.main_output_dir, '{:05d}.jpg'.format(i)), image)

@@ -4,7 +4,7 @@ import datetime
 from multiprocessing import Process
 import torch
 
-from lib.utils.logger import logger
+from lib.utils.logger import ALL_LoggerContainer
 from socket import *
 import struct
 
@@ -39,15 +39,15 @@ class PostProcess(Process):
                 ServerSocket = socket(AF_INET, SOCK_STREAM)
                 ServerSocket.bind(ADDRESS)
                 ServerSocket.listen()
-                logger.logger_dict[os.getpid()].info("Waiting for TCP connection at {}:{}".format(HOST, PORT))
+                ALL_LoggerContainer.logger_dict[os.getpid()].info("Waiting for TCP connection at {}:{}".format(HOST, PORT))
 
                 self.ConnectionSocket, address = ServerSocket.accept()
-                logger.logger_dict[os.getpid()].info(
+                ALL_LoggerContainer.logger_dict[os.getpid()].info(
                     "Successfully connected to {} and connection on {}".format(ADDRESS, address))
             elif self.mode == "Outer_UDP":
                 ServerSocket = socket(AF_INET, SOCK_DGRAM)
                 self.ConnectionSocket = ServerSocket
-                logger.logger_dict[os.getpid()].info("UDP connection at {}:{}".format(HOST, PORT))
+                ALL_LoggerContainer.logger_dict[os.getpid()].info("UDP connection at {}:{}".format(HOST, PORT))
             else:
                 raise
 

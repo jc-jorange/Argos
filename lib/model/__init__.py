@@ -11,7 +11,7 @@ import datetime
 import yaml
 from collections import OrderedDict
 
-from lib.utils.logger import logger
+from lib.utils.logger import ALL_LoggerContainer
 from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture
 from lib.model.model_config import E_arch_position, E_model_general_info, E_model_part_input_info, E_model_part_input_info
 from lib.model.model_config import model_general_info_default_dict
@@ -27,7 +27,7 @@ def load_model(model,
                lr_step=None):
     """
     """
-    local_logger = logger.logger_dict[os.getpid()]
+    local_logger = ALL_LoggerContainer.logger_dict[os.getpid()]
     start_lr = lr
     start_epoch = 0
     checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -116,7 +116,7 @@ class BaseModel(nn.Module):
             opt,
     ):
         super(BaseModel, self).__init__()
-        self.logger = logger.logger_dict[os.getpid()]
+        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
 
         self.input_info = {}
 

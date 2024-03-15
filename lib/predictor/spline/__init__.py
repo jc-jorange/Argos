@@ -19,16 +19,13 @@ class BaseSpline(BasePredictor):
         [S_point],
     ]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         self.m_characteristic = torch.tensor(self.m_characteristic)
-        super(BaseSpline, self).__init__(*args, **kwargs)
+        super(BaseSpline, self).__init__(**kwargs)
 
-    def spline_set_new_base(self) -> None:
+    def set_new_base(self, point) -> S_point:
         self.process_geometrical_constraint_matrix()
-
-    def set_new_base(self, point) -> None:
-        super(BaseSpline, self).set_new_base(point=point)
-        self.spline_set_new_base()
+        return super(BaseSpline, self).set_new_base(point=point)
 
     def clear(self) -> None:
         super(BaseSpline, self).clear()
@@ -43,7 +40,7 @@ class BaseSpline(BasePredictor):
         self.m_geometrical_constraint = torch.tensor(self.m_geometrical_constraint)
 
     def predict_content(self, t: float) -> torch.Tensor:
-        t = (t - self.time_0) / self.dt_base
+        t = ((t - self.time_0) / self.dt_base) * 0.001
         m_t = [1, t, t ** 2, t ** 3]
         m_t = torch.tensor(m_t)
         return m_t @ self.m_characteristic @ self.m_geometrical_constraint

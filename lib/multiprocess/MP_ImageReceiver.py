@@ -7,13 +7,8 @@ import traceback
 import numpy as np
 import cv2
 
-from collections import defaultdict
-from multiprocessing import Process, Lock, Value, shared_memory
-
-from lib.utils.logger import logger
-from lib.tracker.utils.utils import mkdir_if_missing
+from ..multiprocess import BaseProcess, E_SharedDictType, E_Multiprocess
 from lib.dataset.utils.utils import create_gamma_img, clear_socket_buffer
-import lib.multiprocess.Shared as Sh
 
 
 @unique
@@ -28,30 +23,17 @@ class E_ImageInfo(Enum):
     Size = 2
 
 
-class ImageReceiver(Process):
+class ImageReceiver(BaseProcess):
+    prefix = 'Argus-SubProcess-ImageReceiver_'
+
     def __init__(self,
-                 idx: int,
-                 opt,
-                 shared_image_dict: Sh.SharedDict
+                 *args
                  ):
-        super().__init__()
+        super().__init__(*args)
 
-        self.idx = idx
-        self.opt = opt
-        self.shared_image_dict = shared_image_dict
+        self.making_process_main_save_dir('camera_raw_')
 
-        self.name = 'Argus-SubProcess-ImageReceiver_' + str(idx)
-        self.output_dir = os.path.join(opt.save_dir, 'camera_raw_' + str(idx+1))
-        mkdir_if_missing(self.output_dir)
-
-        self.logger = logger.add_logger(os.getpid())
-        logger.add_stream_handler(os.getpid())
-        logger.add_file_handler(os.getpid(), self.name, self.output_dir)
-
-        logger.set_logger_level(os.getpid(), 'debug' if self.opt.debug else 'info')
-        self.logger.info("This is the Image Receiver Process No.{:d}".format(self.idx))
-
-        path = opt.input_path[idx]
+        path = self.opt.input_path[self.idx]
         address_str_list = path.split(':')
         self.connect_type, ip, port = address_str_list[0], address_str_list[1], int(address_str_list[2])
         try:
@@ -165,6 +147,10 @@ class ImageReceiver(Process):
         return img, bReadResult
 
     def run(self):
+        super(ImageReceiver, self).run()
+        self.set_logger_file_handler(self.name, self.main_output_dir)
+        self.logger.info("This is the Image Receiver Process No.{:d}".format(self.idx))
+
         if self.connect_type == E_SupportConnectionType.TCP.name:
             ServerSocket = socket(AF_INET, SOCK_STREAM)
             ServerSocket.bind(self.address)
@@ -186,19 +172,17 @@ class ImageReceiver(Process):
         self.ConnectionSocket.settimeout(60)
 
         self.logger.info("Waiting connection send image at {}:{}".format(self.address[0], self.address[1]))
-        bInitialImg = False
-        while not bInitialImg:
-            ini_img, bInitialImg = self.read_image()
-        self.shared_image_dict.set_data(E_ImageInfo.Data, ini_img)
-        self.shared_image_dict.set_data(E_ImageInfo.Size, ini_img.size)
-        self.logger.info("Receive initial image at {}:{}".format(self.address[0], self.address[1]))
-
         start_time = time.perf_counter()
+        bDoOnce = True
         while self.keep_process:
             img_0, bRecv = self.read_image()
             if bRecv:
                 img_0.flatten()
-                self.shared_image_dict.set_data(E_ImageInfo.Data, img_0)
+                self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Data, img_0)
+                self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Size, img_0.size)
+                if bDoOnce:
+                    self.logger.info("Receive initial image at {}:{}".format(self.address[0], self.address[1]))
+                    bDoOnce = False
 
         end_time = time.perf_counter()
         self.logger.info(
