@@ -3,8 +3,8 @@ from collections import defaultdict
 from multiprocessing import Process
 from enum import Enum, unique
 
-from ..multiprocess import BaseProcess, E_SharedDictType, E_Multiprocess
-from .MP_ImageReceiver import E_ImageInfo
+from ..multiprocess import BaseProcess, ESharedDictType, EMultiprocess
+from .MP_ImageReceiver import EImageInfo
 from lib.tracker.multitracker import MCJDETracker
 from lib.tracker.utils.utils import *
 from lib.tracker.utils import write_result as wr, visualization as vis
@@ -13,23 +13,24 @@ from lib.dataset.__init__ import LoadData
 
 
 @unique
-class E_TrackInfo(Enum):
+class ETrackInfo(Enum):
     Result = 1
 
 
-class Tracker_Process(BaseProcess):
+class TrackerProcess(BaseProcess):
     prefix = 'Argus-SubProcess-Tracker_'
 
     def __init__(self,
                  *args,
-                 frame_rate=24
+                 frame_rate=24,
+                 **kwargs
                  ):
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
         # self.frame_rate = frame_rate
 
         self.making_process_main_save_dir('camera_')
 
-        self.data_loader = LoadData(self.idx, self.opt.input_mode, self.opt.input_path[self.idx], self.container_shared_dict[E_SharedDictType.Image])
+        self.data_loader = LoadData(self.idx, self.opt.input_mode, self.opt.input_path[self.idx], self.container_shared_dict[ESharedDictType.Image])
 
         self.set_logger_file_handler(self.name + '_Tracker_Log', self.main_output_dir)
         self.logger.info("This is the Tracker Process No.{:d}".format(self.idx))
@@ -54,7 +55,7 @@ class Tracker_Process(BaseProcess):
         self.fps_loop_current = 0
 
     def run(self):
-        super(Tracker_Process, self).run()
+        super(TrackerProcess, self).run()
 
         self.logger.info('Start tracking')
         self.timer_loop.tic()
@@ -104,10 +105,10 @@ class Tracker_Process(BaseProcess):
                                                  online_scores_dict[cls_id]))
                         current_result[cls_id, t_id] = xywh
 
-            self.container_shared_dict[E_SharedDictType.Track][self.idx].set_data(E_TrackInfo.Result, current_result)
+            self.container_shared_dict[ESharedDictType.Track][self.idx].set_data(ETrackInfo.Result, current_result)
 
-            self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Data, img0)
-            self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Size, img0.size)
+            self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Data, img0)
+            self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Size, img0.size)
 
             self.fps_loop_avg = self.frame_id / max(1e-5, self.timer_loop.total_time)
             self.fps_loop_current = 1.0 / max(1e-5, self.timer_loop.diff)

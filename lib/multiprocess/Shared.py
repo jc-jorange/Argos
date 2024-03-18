@@ -5,7 +5,7 @@ from enum import Enum, unique
 
 
 @unique
-class E_SharedDictType(Enum):
+class ESharedDictType(Enum):
     Image = 1
     Track = 2
     Predict = 3

@@ -12,13 +12,14 @@ from lib.utils.logger import ALL_LoggerContainer
 from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
 from lib.tracker.utils.utils import mkdir_if_missing
-from lib.multiprocess.MP_Tracker import Tracker_Process
-from lib.multiprocess.MP_ImageReceiver import ImageReceiver
+from lib.multiprocess.MP_Tracker import TrackerProcess
+from lib.multiprocess.MP_ImageReceiver import ImageReceiverProcess
 from lib.multiprocess.MP_PathPredict import PathPredictProcess
 import lib.multiprocess.Shared as Sh
-from lib.multiprocess.Shared import E_SharedDictType
-from lib.multiprocess import E_Multiprocess
-import lib.multiprocess.MP_MultiCameraPredict as MP_Post
+from lib.multiprocess.Shared import ESharedDictType
+from lib.multiprocess import EMultiprocess
+from lib.predictor.spline.hermite_spline import HermiteSpline
+import lib.multiprocess.MP_PostIdMatch as MP_Post
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -165,15 +166,15 @@ def track(opt_data):
         main_logger.info('  %s: %s' % (str(k), str(v)))
 
     container_multiprocess = {
-        E_Multiprocess.ImageReceiver: {},
-        E_Multiprocess.Tracker: {},
-        E_Multiprocess.Predictor: {}
+        EMultiprocess.ImageReceiver: {},
+        EMultiprocess.Tracker: {},
+        EMultiprocess.Predictor: {}
     }
 
     container_shared_dict = {
-        E_SharedDictType.Image: {},
-        E_SharedDictType.Track: {},
-        E_SharedDictType.Predict: {}
+        ESharedDictType.Image: {},
+        ESharedDictType.Track: {},
+        ESharedDictType.Predict: {}
     }
 
     sub_processor_num = len(opt_data.input_path)
@@ -182,49 +183,49 @@ def track(opt_data):
     for model_index in range(sub_processor_num):
 
         shared_dict_image = Sh.SharedDict()
-        container_shared_dict[E_SharedDictType.Image][model_index] = shared_dict_image
+        container_shared_dict[ESharedDictType.Image][model_index] = shared_dict_image
 
         shared_dict_track = Sh.SharedDict()
-        container_shared_dict[E_SharedDictType.Track][model_index] = shared_dict_track
+        container_shared_dict[ESharedDictType.Track][model_index] = shared_dict_track
 
         shared_dict_predict = Sh.SharedDict()
-        container_shared_dict[E_SharedDictType.Predict][model_index] = shared_dict_predict
+        container_shared_dict[ESharedDictType.Predict][model_index] = shared_dict_predict
 
         if opt_data.input_mode == 'Address':
             main_logger.info('-' * 5 + f'Setting Image Receiver Sub-Processor {model_index}')
-            img_receiver = ImageReceiver(model_index, opt_data, container_shared_dict)
-            container_multiprocess[E_Multiprocess.ImageReceiver][model_index] = img_receiver
+            img_receiver = ImageReceiverProcess(model_index, opt_data, container_shared_dict)
+            container_multiprocess[EMultiprocess.ImageReceiver][model_index] = img_receiver
 
         main_logger.info('-' * 5 + f'Setting Tracker Sub-Processor {model_index}')
-        tracker = Tracker_Process(model_index, opt_data, container_shared_dict)
-        container_multiprocess[E_Multiprocess.Tracker][model_index] = tracker
+        tracker = TrackerProcess(model_index, opt_data, container_shared_dict)
+        container_multiprocess[EMultiprocess.Tracker][model_index] = tracker
 
         main_logger.info('-' * 5 + f'Setting Predictor Sub-Processor {model_index}')
-        path_predictor = PathPredictProcess(model_index, opt_data, container_shared_dict)
-        container_multiprocess[E_Multiprocess.Predictor][model_index] = path_predictor
+        path_predictor = PathPredictProcess(HermiteSpline, model_index, opt_data, container_shared_dict,)
+        container_multiprocess[EMultiprocess.Predictor][model_index] = path_predictor
 
-    for i, p in container_multiprocess[E_Multiprocess.ImageReceiver].items():
+    for i, p in container_multiprocess[EMultiprocess.ImageReceiver].items():
         main_logger.info('-' * 5 + f'Start Image Receiver Sub-Process No.{i}')
         p.start()
 
-    for i, p in container_multiprocess[E_Multiprocess.Tracker].items():
+    for i, p in container_multiprocess[EMultiprocess.Tracker].items():
         main_logger.info('-' * 5 + f'Start Tracker Sub-Process No.{i}')
         p.start()
 
-    for i, p in container_multiprocess[E_Multiprocess.Predictor].items():
+    for i, p in container_multiprocess[EMultiprocess.Predictor].items():
         main_logger.info('-' * 5 + f'Start Predictor Sub-Process No.{i}')
         p.start()
 
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
-        for i, p in container_multiprocess[E_Multiprocess.Tracker].items():
+        for i, p in container_multiprocess[EMultiprocess.Tracker].items():
             b_check_tracker = b_check_tracker or p.is_alive()
 
-    for i, each in container_multiprocess[E_Multiprocess.Predictor].items():
+    for i, each in container_multiprocess[EMultiprocess.Predictor].items():
         each.terminate()
 
-    for i, each in container_multiprocess[E_Multiprocess.ImageReceiver].items():
+    for i, each in container_multiprocess[EMultiprocess.ImageReceiver].items():
         each.terminate()
 
     main_logger.info('-' * 10 + 'Main Finished' + '-' * 10)

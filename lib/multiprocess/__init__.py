@@ -4,12 +4,12 @@ from enum import Enum, unique
 
 from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
-from lib.multiprocess.Shared import E_SharedDictType
+from lib.multiprocess.Shared import ESharedDictType
 from lib.tracker.utils.utils import mkdir_if_missing
 
 
 @unique
-class E_Multiprocess(Enum):
+class EMultiprocess(Enum):
     ImageReceiver = 1
     Tracker = 2
     Predictor = 3
@@ -23,8 +23,8 @@ class BaseProcess(Process):
                  idx: int,
                  opt: opts,
                  container_shared_dict: {},
-                 **kwargs) -> None:
-        super(BaseProcess, self).__init__(**kwargs)
+                 ) -> None:
+        super(BaseProcess, self).__init__()
 
         self.idx = idx
         self.opt = opt

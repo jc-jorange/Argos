@@ -1,5 +1,5 @@
 import torch.nn as nn
-from ..utils import *
+from lib.utils.utils import *
 
 
 class BaseModel_head(nn.Module):

@@ -19,7 +19,7 @@ from lib.utils.utils import xyxy2xywh
 from lib.model.model_config import E_arch_position, E_model_part_input_info
 from lib.dataset.utils.utils import create_gamma_img, clear_socket_buffer
 import lib.multiprocess.Shared as Sh
-from  lib.multiprocess.MP_ImageReceiver import E_ImageInfo
+from  lib.multiprocess.MP_ImageReceiver import EImageInfo
 
 def letterbox(img,
               height=608,
@@ -115,7 +115,7 @@ class LoadData:
                 raise StopIteration
         elif self.data_type == 'Address':
             try:
-                self.shared_image_dict.read_data(E_ImageInfo.Data)
+                self.shared_image_dict.read_data(EImageInfo.Data)
             except KeyError:
                 raise StopIteration
 

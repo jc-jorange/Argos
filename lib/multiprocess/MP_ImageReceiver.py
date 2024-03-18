@@ -7,29 +7,30 @@ import traceback
 import numpy as np
 import cv2
 
-from ..multiprocess import BaseProcess, E_SharedDictType, E_Multiprocess
+from ..multiprocess import BaseProcess, ESharedDictType, EMultiprocess
 from lib.dataset.utils.utils import create_gamma_img, clear_socket_buffer
 
 
 @unique
-class E_SupportConnectionType(Enum):
+class ESupportConnectionType(Enum):
     TCP = 1
     UDP = 2
 
 
 @unique
-class E_ImageInfo(Enum):
+class EImageInfo(Enum):
     Data = 1
     Size = 2
 
 
-class ImageReceiver(BaseProcess):
+class ImageReceiverProcess(BaseProcess):
     prefix = 'Argus-SubProcess-ImageReceiver_'
 
     def __init__(self,
-                 *args
+                 *args,
+                 **kwargs,
                  ):
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
 
         self.making_process_main_save_dir('camera_raw_')
 
@@ -37,7 +38,7 @@ class ImageReceiver(BaseProcess):
         address_str_list = path.split(':')
         self.connect_type, ip, port = address_str_list[0], address_str_list[1], int(address_str_list[2])
         try:
-            E_SupportConnectionType[self.connect_type]
+            ESupportConnectionType[self.connect_type]
         except KeyError:
             self.logger.warn("None support connection type {:s}. Please check it.".format(self.connect_type))
             self.close()
@@ -147,11 +148,11 @@ class ImageReceiver(BaseProcess):
         return img, bReadResult
 
     def run(self):
-        super(ImageReceiver, self).run()
+        super(ImageReceiverProcess, self).run()
         self.set_logger_file_handler(self.name, self.main_output_dir)
         self.logger.info("This is the Image Receiver Process No.{:d}".format(self.idx))
 
-        if self.connect_type == E_SupportConnectionType.TCP.name:
+        if self.connect_type == ESupportConnectionType.TCP.name:
             ServerSocket = socket(AF_INET, SOCK_STREAM)
             ServerSocket.bind(self.address)
             self.logger.info("Waiting for TCP connection at {}:{}".format(self.address[0], self.address[1]))
@@ -161,7 +162,7 @@ class ImageReceiver(BaseProcess):
             self.logger.info(
                 "Successfully connected to {} and connection on {}".format(self.address, address)
             )
-        elif self.connect_type == E_SupportConnectionType.UDP.name:
+        elif self.connect_type == ESupportConnectionType.UDP.name:
             ServerSocket = socket(AF_INET, SOCK_DGRAM)
             ServerSocket.bind(self.address)
             self.ConnectionSocket = ServerSocket
@@ -178,8 +179,8 @@ class ImageReceiver(BaseProcess):
             img_0, bRecv = self.read_image()
             if bRecv:
                 img_0.flatten()
-                self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Data, img_0)
-                self.container_shared_dict[E_SharedDictType.Image][self.idx].set_data(E_ImageInfo.Size, img_0.size)
+                self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Data, img_0)
+                self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Size, img_0.size)
                 if bDoOnce:
                     self.logger.info("Receive initial image at {}:{}".format(self.address[0], self.address[1]))
                     bDoOnce = False

@@ -1,12 +1,15 @@
 import numpy as np
 import time
+from enum import Enum, unique
 
 S_point = np.ndarray  # shape:[class, id, (xy)]
 
 
 class BasePredictor:
 
-    def __init__(self, max_step=300, max_distance=50, **kwargs) -> None:
+    def __init__(self,
+                 max_step=300,
+                 max_distance=50) -> None:
         self.time_0 = 0.0
         self.dt_base = 1.0
         self.p0_list = []
@@ -16,7 +19,7 @@ class BasePredictor:
         self.max_step = max_step
         self.max_distance = max_distance
 
-    def filter_close_track(self, point: S_point, t: float) -> S_point:
+    def filter_close_track(self, point: S_point, t: float) -> {S_point}:
         predict_result = self.get_predicted_position(t)
         try:
             if predict_result.any():
@@ -115,3 +118,18 @@ class BasePredictor:
             return self.predict_content(t=t)
         else:
             return None
+
+
+from .spline.linear_spline import LinearSpline
+from .spline.hermite_spline import HermiteSpline
+
+@unique
+class EPredictorName(Enum):
+    LinearSpline = 1
+    HermiteSpline = 2
+
+
+predictor_factory = {
+    EPredictorName.LinearSpline.name: LinearSpline,
+    EPredictorName.HermiteSpline.name: HermiteSpline,
+}

@@ -24,7 +24,6 @@ class HermiteSpline(BaseSpline):
             self.p0_list.append(point)
             self.time_list.append(t)
 
-
     def process_geometrical_constraint_matrix(self) -> None:
         raw_0 = torch.tensor(self.p0_list[-3])
         raw_1 = torch.tensor(self.p0_list[-2])

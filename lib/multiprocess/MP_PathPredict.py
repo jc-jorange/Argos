@@ -1,25 +1,29 @@
 import time
+from typing import Type
 
-from ..multiprocess import BaseProcess, E_SharedDictType, E_Multiprocess
-from lib.multiprocess.MP_Tracker import E_TrackInfo
-from lib.multiprocess.MP_ImageReceiver import E_ImageInfo
+from ..multiprocess import BaseProcess, ESharedDictType, EMultiprocess
+from lib.multiprocess.MP_Tracker import ETrackInfo
+from lib.multiprocess.MP_ImageReceiver import EImageInfo
+from lib.predictor import BasePredictor
 from lib.predictor.spline.hermite_spline import HermiteSpline
-import lib.multiprocess.Shared as Sh
 from lib.tracker.utils.utils import *
-from lib.tracker.utils import write_result as wr, visualization as vis
+
 
 class PathPredictProcess(BaseProcess):
     prefix = 'Argus-SubProcess-PathPredictProcess_'
+
     def __init__(self,
-                 *args
+                 predictor_class: Type[BasePredictor],
+                 *args,
+                 **kwargs
                  ):
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
         self.making_process_main_save_dir('camera_predict_')
 
         self.track_result = None
         self.predict_result = None
 
-        self.predictor = HermiteSpline()
+        self.predictor = predictor_class()
 
     def run(self):
         super(PathPredictProcess, self).run()
@@ -28,13 +32,13 @@ class PathPredictProcess(BaseProcess):
         self.predictor.time_0 = t1
         while True:
             t2 = time.perf_counter()
-            self.track_result = self.container_shared_dict[E_SharedDictType.Track][self.idx].read_data(E_TrackInfo.Result)
+            self.track_result = self.container_shared_dict[ESharedDictType.Track][self.idx].read_data(ETrackInfo.Result)
             if isinstance(self.track_result, np.ndarray):
                 self.predict_result = self.predictor.set_new_base(self.track_result)
             else:
                 self.predict_result = self.predictor.get_predicted_position(t2)
 
-            image = self.container_shared_dict[E_SharedDictType.Image][self.idx].read_data(E_ImageInfo.Data)
+            image = self.container_shared_dict[ESharedDictType.Image][self.idx].read_data(EImageInfo.Data)
 
             if isinstance(self.predict_result, np.ndarray) and isinstance(image, np.ndarray):
                 for i_c, e_c in enumerate(self.predict_result):

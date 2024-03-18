@@ -7,30 +7,8 @@ import torch
 import numpy as np
 
 
-def select_device(opt, apex=False, batch_size=None):
-    # device = '[-1]' or '[0]' or '[0,1,2,3]'
-    gpus_str = ','.join(str(x) for x in opt.gpus)
-    using_cuda = False  # default not use cuda
-    if '-1' not in opt.gpus:
-        os.environ['CUDA_VISIBLE_DEVICES'] = gpus_str
-        assert torch.cuda.is_available(), 'CUDA unavailable, invalid device %s requested' % gpus_str  # check cuda
-        c = 1024 ** 2  # bytes to MB
-        ng = torch.cuda.device_count()
-        if ng > 1 and batch_size:  # check that batch_size is compatible with device_count
-            assert batch_size % ng == 0, 'batch-size %g not multiple of GPU count %g' % (batch_size, ng)
-        x = [torch.cuda.get_device_properties(i) for i in range(ng)]
-        using_cuda = True
-        s = 'Using CUDA ' + ('Apex ' if apex else '')  # apex for mixed precision https://github.com/NVIDIA/apex
-        for i in range(0, ng):
-            if i == 1:
-                s = ' ' * len(s)
-            print("%sdevice%g _CudaDeviceProperties(name='%s', total_memory=%dMB)" %
-                  (s, i, x[i].name, x[i].total_memory / c))
-    else:
-        print('Using CPU')
-
-    print('\n')  # skip a line
-    return torch.device('cuda' if using_cuda else 'cpu')
+def model_dir_name(module_file: str):
+    return os.path.split(os.path.dirname(module_file))[1]
 
 
 class AverageMeter(object):
