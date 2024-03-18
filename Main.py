@@ -28,7 +28,7 @@ TENSORBOARD_WRITER_NAME = 'Argus-Train-TensorboardWriter'
 
 
 def train(opt_data):
-    ALL_LoggerContainer.add_tensorboard_writer(TENSORBOARD_WRITER_NAME)
+    ALL_LoggerContainer.add_tensorboard_writer(TENSORBOARD_WRITER_NAME, opt.save_dir)
 
     torch.manual_seed(opt_data.seed)
     torch.backends.cudnn.benchmark = not opt_data.not_cuda_benchmark
@@ -101,7 +101,7 @@ def train(opt_data):
     trainer = BaseTrainer(opt=opt_data, model=model, optimizer=optimizer)
     trainer.set_device(opt_data.gpus, opt_data.chunk_sizes, opt_data.device)
 
-    ALL_LoggerContainer.dump_cfg(os.getpid(), model.cfg)
+    ALL_LoggerContainer.dump_cfg(multiprocessing.current_process().name, model.cfg)
 
     main_logger.info('-' * 5 + 'Starting training...')
     for epoch in range(start_epoch + 1, start_epoch + opt_data.num_epochs + 1):

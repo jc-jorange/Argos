@@ -8,6 +8,7 @@ import torch
 from progress.bar import Bar
 import motmetrics as mm
 import torchsummary
+import multiprocessing
 
 from lib.model import BaseModel
 from lib.model.data_parallel import DataParallel
@@ -34,7 +35,7 @@ class ModelWithLoss(torch.nn.Module):
 
 class BaseTrainer(object):
     def __init__(self, opt, model, optimizer=None):
-        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
+        self.logger = ALL_LoggerContainer.logger_dict[multiprocessing.current_process().name]
         self.opt = opt
         self.optimizer = optimizer
         self.loss = model.Main.head.loss_class(opt=opt, cfg=model.Main.head.loss_cfg, model_info=model.info_data)

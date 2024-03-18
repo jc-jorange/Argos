@@ -11,6 +11,7 @@ import traceback
 import cv2
 import numpy as np
 from socket import *
+import multiprocessing
 
 from collections import OrderedDict, defaultdict
 from lib.utils.logger import ALL_LoggerContainer
@@ -459,7 +460,7 @@ class TrainingDataset(LoadImagesAndLabels):
         :param augment:
         :param transforms: Image data transformations, default is transforms.ToTensor
         """
-        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
+        self.logger = ALL_LoggerContainer.logger_dict[multiprocessing.current_process().name]
         self.opt = opt
         self.info_data = info_data
         self.img_files = OrderedDict()

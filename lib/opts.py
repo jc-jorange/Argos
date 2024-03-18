@@ -204,7 +204,7 @@ class opts(object):
                 else opt.save_dir
             opt.load_model = os.path.join(model_path, 'model_last.pth')
 
-        opt.device = self.select_device()
+        opt.device = self.select_device(opt)
 
         return opt
 
@@ -212,11 +212,12 @@ class opts(object):
         opt = self.parse(args)
         return opt
 
-    def select_device(self, apex=False, batch_size=None):
+    @staticmethod
+    def select_device(opt, apex=False, batch_size=None):
         # device = '[-1]' or '[0]' or '[0,1,2,3]'
-        gpus_str = ','.join(str(x) for x in self.gpus)
+        gpus_str = ','.join(str(x) for x in opt.gpus)
         using_cuda = False  # default not use cuda
-        if '-1' not in self.gpus:
+        if '-1' not in opt.gpus:
             os.environ['CUDA_VISIBLE_DEVICES'] = gpus_str
             assert torch.cuda.is_available(), 'CUDA unavailable, invalid device {} requested'.format(gpus_str)  # check cuda
             c = 1024 ** 2  # bytes to MB
