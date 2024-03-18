@@ -30,7 +30,7 @@ class Logger_Container:
 
     def add_logger(self, name: str) -> logging.Logger:
         local_logger = logging.getLogger(name + '_logger')
-        self.logger_dict[name] = local_logger
+        self.logger_dict[os.getpid()] = local_logger
         return local_logger
 
     def add_tensorboard_writer(self, name: str, log_dir: str) -> None:
@@ -40,7 +40,7 @@ class Logger_Container:
     def add_stream_handler(self, logger_name: str) -> None:
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
-        self.logger_dict[logger_name].addHandler(stream_handler)
+        self.logger_dict[os.getpid()].addHandler(stream_handler)
         self.stream_handler_dict[logger_name] = stream_handler
 
     def add_file_handler(self, logger_name: str, log_filename: str, log_dir: str) -> None:
@@ -48,7 +48,7 @@ class Logger_Container:
         log_file = log_dir + '/' + log_filename + '_log.txt'
         file_handler = logging.FileHandler(filename=log_file, encoding='utf-8')
         file_handler.setFormatter(formatter)
-        self.logger_dict[logger_name].addHandler(file_handler)
+        self.logger_dict[os.getpid()].addHandler(file_handler)
         self.file_handler_dict[logger_name] = file_handler
 
     def set_logger_level(self, logger_name: str, level_name: str) -> None:
@@ -60,9 +60,9 @@ class Logger_Container:
             print(list(self.level_relations.keys()))
             raise
         else:
-            self.logger_dict[logger_name].setLevel(level)
-            self.logger_dict[logger_name].warning('set process-id-{} log level to {}'
-                                               .format(self.logger_dict[logger_name].name, level_name))
+            self.logger_dict[os.getpid()].setLevel(level)
+            self.logger_dict[os.getpid()].warning('set process-id-{} log level to {}'
+                                               .format(self.logger_dict[os.getpid()].name, level_name))
 
     def scalar_summary_to_tensorboard(self, name: str, tag: str, value, step: int) -> None:
         """Log a scalar variable."""

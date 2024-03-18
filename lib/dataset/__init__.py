@@ -65,7 +65,7 @@ class LoadData:
         self.frame_rate = 10  # no actual meaning here
         self.data_type = data_type
         self.path = path
-        self.logger = ALL_LoggerContainer.logger_dict[ALL_LoggerContainer.logger_dict.items()[0][0]]
+        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
         self.last_process_time = -1
         self.idx = idx
         # self.pipe_ImageReceiver_out = pipe

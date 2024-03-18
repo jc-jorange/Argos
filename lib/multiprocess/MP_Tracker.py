@@ -30,17 +30,6 @@ class TrackerProcess(BaseProcess):
 
         self.making_process_main_save_dir('camera_')
 
-        self.data_loader = LoadData(self.idx, self.opt.input_mode, self.opt.input_path[self.idx], self.container_shared_dict[ESharedDictType.Image])
-
-        self.set_logger_file_handler(self.name + '_Tracker_Log', self.main_output_dir)
-        self.logger.info("This is the Tracker Process No.{:d}".format(self.idx))
-
-        self.logger.info('Creating tracker')
-        self.tracker = MCJDETracker(self.opt, 24)
-        self.info_data = self.tracker.model.info_data
-
-        self.results_dict = {cls_id: [] for cls_id in range(self.info_data.classes_max_num)}
-
         self.timer_loop = Timer()
         self.timer_track = Timer()
 
@@ -56,6 +45,17 @@ class TrackerProcess(BaseProcess):
 
     def run(self):
         super(TrackerProcess, self).run()
+
+        self.data_loader = LoadData(self.idx, self.opt.input_mode, self.opt.input_path[self.idx], self.container_shared_dict[ESharedDictType.Image])
+
+        self.set_logger_file_handler(self.name + '_Tracker_Log', self.main_output_dir)
+        self.logger.info("This is the Tracker Process No.{:d}".format(self.idx))
+
+        self.logger.info('Creating tracker')
+        self.tracker = MCJDETracker(self.opt, 24)
+        self.info_data = self.tracker.model.info_data
+
+        self.results_dict = {cls_id: [] for cls_id in range(self.info_data.classes_max_num)}
 
         self.logger.info('Start tracking')
         self.timer_loop.tic()

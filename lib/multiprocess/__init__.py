@@ -31,12 +31,17 @@ class BaseProcess(Process):
         self.container_shared_dict = container_shared_dict
 
         self.name = self.prefix + str(idx)
+        self.logger = None
 
         self.main_output_dir = None
+
+    def run(self) -> None:
+        super(BaseProcess, self).run()
 
         self.logger = ALL_LoggerContainer.add_logger(self.name)
         ALL_LoggerContainer.add_stream_handler(self.name)
         ALL_LoggerContainer.set_logger_level(self.name, 'debug' if self.opt.debug else 'info')
+        self.logger.info('set log level from "debug" to "info" ')
 
     @staticmethod
     def making_dir(root: str, name: str) -> (str, bool):

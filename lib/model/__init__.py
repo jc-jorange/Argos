@@ -28,7 +28,7 @@ def load_model(model,
                lr_step=None):
     """
     """
-    local_logger = ALL_LoggerContainer.logger_dict[multiprocessing.current_process().name]
+    local_logger = ALL_LoggerContainer.logger_dict[os.getpid()]
     start_lr = lr
     start_epoch = 0
     checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -117,7 +117,7 @@ class BaseModel(nn.Module):
             opt,
     ):
         super(BaseModel, self).__init__()
-        self.logger = ALL_LoggerContainer.logger_dict[multiprocessing.current_process().name]
+        self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
 
         self.input_info = {}
 
