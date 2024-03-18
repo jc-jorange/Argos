@@ -4,7 +4,6 @@ from __future__ import print_function
 
 # Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
 import os
-import tensorboardX
 import logging
 
 formatter = logging.Formatter(
@@ -35,6 +34,7 @@ class Logger_Container:
         return local_logger
 
     def add_tensorboard_writer(self, name: str, log_dir: str) -> None:
+        import tensorboardX
         self.tensorboard_writer_dict[name] = tensorboardX.SummaryWriter(log_dir=log_dir)
 
     def add_stream_handler(self, logger_name: str) -> None:
