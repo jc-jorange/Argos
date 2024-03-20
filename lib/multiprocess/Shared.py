@@ -14,7 +14,7 @@ class ESharedDictType(Enum):
 NAME_shm_img = 'RecvImg_'
 
 
-def store_in_shm(name: str, data) -> np.ndarray:
+def store_in_shm(name: str, data) -> shared_memory.SharedMemory:
     shm = shared_memory.SharedMemory(name=name, create=True, size=data.nbytes)
     shm_data = np.ndarray(data.shape, dtype=data.dtype, buffer=shm.buf)
     shm_data[:] = data[:]
@@ -57,8 +57,8 @@ class SharedDict:
             return None
 
     def pop_data(self, key: any) -> any:
-        # try:
-        #     return self.mp_dict.pop(key)
-        # except KeyError:
-        #     return None
-        return self.mp_dict[key]
+        try:
+            return self.mp_dict.pop(key)
+        except KeyError:
+            return None
+        # return self.mp_dict[key]

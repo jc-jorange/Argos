@@ -35,6 +35,19 @@ class BaseProcess(Process):
 
         self.main_output_dir = None
 
+    def run_begin(self) -> None:
+        ...
+
+    @staticmethod
+    def can_process_run_content() -> bool:
+        return True
+
+    def run_content(self) -> None:
+        ...
+
+    def run_end(self) -> None:
+        ...
+
     def run(self) -> None:
         super(BaseProcess, self).run()
 
@@ -42,6 +55,15 @@ class BaseProcess(Process):
         ALL_LoggerContainer.add_stream_handler(self.name)
         ALL_LoggerContainer.set_logger_level(self.name, 'debug' if self.opt.debug else 'info')
         self.logger.info('set log level from "debug" to "info" ')
+
+        self.run_begin()
+
+        while not self.can_process_run_content():
+            pass
+
+        self.run_content()
+
+        self.run_end()
 
     @staticmethod
     def making_dir(root: str, name: str) -> (str, bool):
