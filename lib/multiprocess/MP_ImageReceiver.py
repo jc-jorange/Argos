@@ -147,8 +147,8 @@ class ImageReceiverProcess(BaseProcess):
         self.logger.debug("Receive {} frame in time {} s".format(self.total_frames, recv_time))
         return img, bReadResult
 
-    def run(self):
-        super(ImageReceiverProcess, self).run()
+    def run_begin(self) -> None:
+        super(ImageReceiverProcess, self).run_begin()
         self.set_logger_file_handler(self.name, self.main_output_dir)
         self.logger.info("This is the Image Receiver Process No.{:d}".format(self.idx))
 
@@ -172,6 +172,7 @@ class ImageReceiverProcess(BaseProcess):
 
         self.ConnectionSocket.settimeout(60)
 
+    def run_action(self) -> None:
         self.logger.info("Waiting connection send image at {}:{}".format(self.address[0], self.address[1]))
         start_time = time.perf_counter()
         bDoOnce = True
@@ -179,8 +180,8 @@ class ImageReceiverProcess(BaseProcess):
             img_0, bRecv = self.read_image()
             if bRecv:
                 img_0.flatten()
-                self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Data, img_0)
-                self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Size, img_0.size)
+                self.container_shared_dict[ESharedDictType.Image][self.idx].set(EImageInfo.Data, img_0)
+                self.container_shared_dict[ESharedDictType.Image][self.idx].set(EImageInfo.Size, img_0.size)
                 if bDoOnce:
                     self.logger.info("Receive initial image at {}:{}".format(self.address[0], self.address[1]))
                     bDoOnce = False
@@ -188,7 +189,7 @@ class ImageReceiverProcess(BaseProcess):
         end_time = time.perf_counter()
         self.logger.info(
             "Total receive {} frames in {} s at {}:{}".format(
-                self.total_frames, end_time-start_time, self.address[0], self.address[1]
+                self.total_frames, end_time - start_time, self.address[0], self.address[1]
             )
         )
 

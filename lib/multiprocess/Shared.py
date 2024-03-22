@@ -6,9 +6,10 @@ from enum import Enum, unique
 
 @unique
 class ESharedDictType(Enum):
-    Image = 1
-    Track = 2
-    Predict = 3
+    Image_Input_List = 1
+    Image_Current = 2
+    Track = 3
+    Predict = 4
 
 
 NAME_shm_img = 'RecvImg_'
@@ -36,29 +37,40 @@ class SharedList:
     def __init__(self) -> None:
         self.mp_list = mp.Manager().list()
 
-    def set_data(self, idx: int, data) -> None:
+    def append(self, data) -> None:
+        self.mp_list.append(data)
+
+    def set(self, idx: int, data) -> None:
+        self.mp_list[idx] = data
+
+    def insert(self, idx: int, data) -> None:
         self.mp_list.insert(idx, data)
 
-    def read_data(self, idx: int) -> any:
+    def read(self, idx: int) -> any:
         return self.mp_list[idx]
+
+    def pop(self, key: any) -> any:
+        try:
+            return self.mp_list.pop(key)
+        except KeyError:
+            return None
 
 
 class SharedDict:
     def __init__(self) -> None:
         self.mp_dict = mp.Manager().dict()
 
-    def set_data(self, key: any, data: any) -> None:
+    def set(self, key: any, data: any) -> None:
         self.mp_dict[key] = data
 
-    def read_data(self, key: any) -> any:
+    def read(self, key: any) -> any:
         try:
             return self.mp_dict[key]
         except KeyError:
             return None
 
-    def pop_data(self, key: any) -> any:
+    def pop(self, key: any) -> any:
         try:
             return self.mp_dict.pop(key)
         except KeyError:
             return None
-        # return self.mp_dict[key]

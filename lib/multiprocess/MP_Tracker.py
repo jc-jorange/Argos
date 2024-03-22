@@ -43,9 +43,8 @@ class TrackerProcess(BaseProcess):
         self.fps_neuralnetwork_current = 0
         self.fps_loop_current = 0
 
-    def run(self):
-        super(TrackerProcess, self).run()
-
+    def run_begin(self) -> None:
+        super(TrackerProcess, self).run_begin()
         self.data_loader = LoadData(self.idx, self.opt.input_mode, self.opt.input_path[self.idx], self.container_shared_dict[ESharedDictType.Image])
 
         self.set_logger_file_handler(self.name + '_Tracker_Log', self.main_output_dir)
@@ -57,6 +56,9 @@ class TrackerProcess(BaseProcess):
 
         self.results_dict = {cls_id: [] for cls_id in range(self.info_data.classes_max_num)}
 
+    
+    def run_action(self) -> None:
+        super(TrackerProcess, self).run_action()
         self.logger.info('Start tracking')
         self.timer_loop.tic()
         # torch.cuda.set_per_process_memory_fraction(0.5, 0)
@@ -105,10 +107,10 @@ class TrackerProcess(BaseProcess):
                                                  online_scores_dict[cls_id]))
                         current_result[cls_id, t_id] = xywh
 
-            self.container_shared_dict[ESharedDictType.Track][self.idx].set_data(ETrackInfo.Result, current_result)
+            self.container_shared_dict[ESharedDictType.Track][self.idx].set(ETrackInfo.Result, current_result)
 
-            self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Data, img0)
-            self.container_shared_dict[ESharedDictType.Image][self.idx].set_data(EImageInfo.Size, img0.size)
+            self.container_shared_dict[ESharedDictType.Image][self.idx].set(EImageInfo.Data, img0)
+            self.container_shared_dict[ESharedDictType.Image][self.idx].set(EImageInfo.Size, img0.size)
 
             self.fps_loop_avg = self.frame_id / max(1e-5, self.timer_loop.total_time)
             self.fps_loop_current = 1.0 / max(1e-5, self.timer_loop.diff)
@@ -177,3 +179,4 @@ class TrackerProcess(BaseProcess):
             self.logger.info('Saving result video to {}, format as mp4'.format(self.main_output_dir))
 
         self.logger.info('-'*5 + 'Tracker Finished' + '-'*5)
+

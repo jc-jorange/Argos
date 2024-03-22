@@ -172,7 +172,8 @@ def track(opt_data):
     }
 
     container_shared_dict = {
-        ESharedDictType.Image: {},
+        ESharedDictType.Image_Input_List: {},
+        ESharedDictType.Image_Current: {},
         ESharedDictType.Track: {},
         ESharedDictType.Predict: {}
     }
@@ -181,9 +182,11 @@ def track(opt_data):
 
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
     for model_index in range(sub_processor_num):
+        shared_list_image_input = Sh.SharedList()
+        container_shared_dict[ESharedDictType.Image_Input_List][model_index] = shared_list_image_input
 
-        shared_dict_image = Sh.SharedDict()
-        container_shared_dict[ESharedDictType.Image][model_index] = shared_dict_image
+        shared_dict_image_current = Sh.SharedDict()
+        container_shared_dict[ESharedDictType.Image_Current][model_index] = shared_dict_image_current
 
         shared_dict_track = Sh.SharedDict()
         container_shared_dict[ESharedDictType.Track][model_index] = shared_dict_track
@@ -204,17 +207,20 @@ def track(opt_data):
         path_predictor = PathPredictProcess(HermiteSpline, model_index, opt_data, container_shared_dict,)
         container_multiprocess[EMultiprocess.Predictor][model_index] = path_predictor
 
+    p: ImageReceiverProcess
     for i, p in container_multiprocess[EMultiprocess.ImageReceiver].items():
         main_logger.info('-' * 5 + f'Start Image Receiver Sub-Process No.{i}')
-        p.start()
+        p.process_run_action()
 
+    p: TrackerProcess
     for i, p in container_multiprocess[EMultiprocess.Tracker].items():
         main_logger.info('-' * 5 + f'Start Tracker Sub-Process No.{i}')
-        p.start()
+        p.process_run_action()
 
+    p: PathPredictProcess
     for i, p in container_multiprocess[EMultiprocess.Predictor].items():
         main_logger.info('-' * 5 + f'Start Predictor Sub-Process No.{i}')
-        p.start()
+        p.process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:

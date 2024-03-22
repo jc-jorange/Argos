@@ -116,7 +116,7 @@ class LoadData:
                 raise StopIteration
         elif self.data_type == 'Address':
             try:
-                self.shared_image_dict.read_data(EImageInfo.Data)
+                self.shared_image_dict.read(EImageInfo.Data)
             except KeyError:
                 raise StopIteration
 
