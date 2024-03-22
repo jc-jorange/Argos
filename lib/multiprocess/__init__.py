@@ -31,18 +31,23 @@ class BaseProcess(Process):
         self.container_shared_dict = container_shared_dict
 
         self.name = self.prefix + str(idx)
+
         self.logger = None
 
         self.main_output_dir = None
 
+        self.b_keep_hold = True
+
     def run_begin(self) -> None:
         ...
 
-    @staticmethod
-    def can_process_run_content() -> bool:
-        return True
+    def process_run_action(self) -> None:
+        self.b_keep_hold = False
 
-    def run_content(self) -> None:
+    def hold_loop_action(self) -> None:
+        ...
+
+    def run_action(self) -> None:
         ...
 
     def run_end(self) -> None:
@@ -58,10 +63,10 @@ class BaseProcess(Process):
 
         self.run_begin()
 
-        while not self.can_process_run_content():
-            pass
+        while self.b_keep_hold:
+            self.hold_loop_action()
 
-        self.run_content()
+        self.run_action()
 
         self.run_end()
 

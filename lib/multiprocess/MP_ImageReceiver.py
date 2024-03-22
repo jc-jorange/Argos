@@ -30,7 +30,7 @@ class ImageReceiverProcess(BaseProcess):
                  *args,
                  **kwargs,
                  ):
-        super().__init__(*args, **kwargs)
+        super(ImageReceiverProcess, self).__init__(*args, **kwargs)
 
         self.making_process_main_save_dir('camera_raw_')
 

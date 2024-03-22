@@ -74,7 +74,7 @@ class LoadData:
         if self.data_type == 'Image':
             if type(path) == str:
                 if os.path.isdir(path):
-                    image_format = ['.jpg', '.jpeg', '.png', '.tif']
+                    image_format = ['.jpg', '.jpeg', '.png', '.tif', '.exr']
                     self.files = sorted(glob.glob('%s/*.*' % path))
                     self.files = list(filter(lambda x: os.path.splitext(x)[
                                                            1].lower() in image_format, self.files))
