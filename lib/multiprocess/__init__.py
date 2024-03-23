@@ -43,6 +43,7 @@ class BaseProcess(Process):
 
     def process_run_action(self) -> None:
         self.b_keep_hold = False
+        pass
 
     def hold_loop_action(self) -> None:
         ...
@@ -63,8 +64,8 @@ class BaseProcess(Process):
 
         self.run_begin()
 
-        while self.b_keep_hold:
-            self.hold_loop_action()
+        # while self.b_keep_hold:
+        #     self.hold_loop_action()
 
         self.run_action()
 

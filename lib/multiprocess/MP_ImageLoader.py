@@ -1,8 +1,12 @@
 import time
 from enum import Enum, unique
 
+import numpy as np
+
 from ..multiprocess import BaseProcess, ESharedDictType
 from lib.input_data_loader import EInputDataType, loader_factory
+import lib.multiprocess.Shared as Sh
+from multiprocessing import Queue
 
 
 @unique
@@ -140,9 +144,9 @@ class ImageLoaderProcess(BaseProcess):
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        for path, img in self.data_loader:
-            if img:
-                self.container_shared_dict[ESharedDictType.Image_Input_List].append(img)
+        for path, img, img_0 in self.data_loader:
+            if path:
+                self.container_shared_dict[ESharedDictType.Image_Input_List][self.idx].append((path, img, img_0))
 
         end_time = time.perf_counter()
         self.load_time = end_time - start_time

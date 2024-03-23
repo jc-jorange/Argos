@@ -208,12 +208,12 @@ def track(opt_data):
         main_logger.info('-' * 5 + f'Setting Predictor Sub-Processor {model_index}')
         path_predictor = PathPredictProcess(HermiteSpline, model_index, opt_data, container_shared_dict,)
         container_multiprocess[EMultiprocess.Predictor][model_index] = path_predictor
-        path_predictor.start()
+        # path_predictor.start()
 
     main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
     global_id_matchor = GlobalIdMatchProcess(0, opt_data, container_shared_dict)
     container_multiprocess[EMultiprocess.GlobalMatching] = global_id_matchor
-    global_id_matchor.start()
+    # global_id_matchor.start()
 
     p: ImageLoaderProcess
     for i, p in container_multiprocess[EMultiprocess.ImageReceiver].items():
@@ -230,7 +230,7 @@ def track(opt_data):
         main_logger.info('-' * 5 + f'Start Predictor Sub-Process No.{i}')
         p.process_run_action()
 
-    container_multiprocess[EMultiprocess.GlobalMatching].process_run_action()
+    # container_multiprocess[EMultiprocess.GlobalMatching].process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:

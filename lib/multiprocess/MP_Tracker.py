@@ -67,7 +67,7 @@ class TrackerProcess(BaseProcess):
         while True:
             path, img, img0 = self.container_shared_dict[ESharedDictType.Image_Input_List][self.idx].pop(0)
 
-            if not path:
+            if not isinstance(img, np.ndarray):
                 break
             else:
                 # loop timer start record
@@ -145,14 +145,11 @@ class TrackerProcess(BaseProcess):
                 self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
                 if self.frame_id % 10 == 0 and self.frame_id != 0:
                     self.logger.info(
-                        'Processing frame {}: {:.2f} loop average fps, {:.2f} loop current fps; '
-                        '{:.2f} track average fps, {:.2f} track current fps'.format(
-                            self.frame_id,
-                            self.fps_loop_avg,
-                            self.fps_loop_current,
-                            self.fps_neuralnetwork_avg,
-                            self.fps_neuralnetwork_current,
-                        )
+                        f'Processing frame {self.frame_id}: '
+                        f'loop average fps: {self.fps_loop_avg:.2f}, '
+                        f'loop current fps: {self.fps_loop_current:.2f}; '
+                        f'track average fps: {self.fps_neuralnetwork_avg:.2f}, '
+                        f'track current fps: {self.fps_neuralnetwork_current:.2f}'
                     )
                 self.logger.debug(
                     'Processing frame {}: {:.2f} track current fps, {} s'.format(
