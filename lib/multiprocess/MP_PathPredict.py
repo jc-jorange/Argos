@@ -3,7 +3,7 @@ from typing import Type
 
 from ..multiprocess import BaseProcess, ESharedDictType, EMultiprocess
 from lib.multiprocess.MP_Tracker import ETrackInfo
-from lib.multiprocess.MP_ImageReceiver import EImageInfo
+from lib.multiprocess.MP_ImageLoader import EImageInfo
 from lib.predictor import BasePredictor
 from lib.predictor.spline.hermite_spline import HermiteSpline
 from lib.tracker.utils.utils import *
@@ -25,6 +25,11 @@ class PathPredictProcess(BaseProcess):
 
         self.predictor = predictor_class()
 
+    def run_begin(self) -> None:
+        super().run_begin()
+        self.set_logger_file_handler(self.name + '_PathPredict_Log', self.main_output_dir)
+        self.logger.info("This is the Path Predictor Process No.{:d}".format(self.idx))
+
     def run_action(self) -> None:
         super(PathPredictProcess, self).run_action()
         t1 = time.perf_counter()
@@ -38,7 +43,7 @@ class PathPredictProcess(BaseProcess):
             else:
                 self.predict_result = self.predictor.get_predicted_position(t2)
 
-            image = self.container_shared_dict[ESharedDictType.Image][self.idx].read(EImageInfo.Data)
+            image = self.container_shared_dict[ESharedDictType.Image_Current][self.idx].read(EImageInfo.Data)
 
             if isinstance(self.predict_result, np.ndarray) and isinstance(image, np.ndarray):
                 for i_c, e_c in enumerate(self.predict_result):

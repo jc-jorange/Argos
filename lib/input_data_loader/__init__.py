@@ -9,7 +9,6 @@ class EInputDataType(Enum):
     Video = 2
     Address = 3
 
-
 class BaseInputDataLoader:
     def __init__(self, path: str):
         self.data_path = path
@@ -19,7 +18,7 @@ class BaseInputDataLoader:
 
         self.count = 0
 
-    def read_image(self, idx):
+    def read_image(self, idx) -> (str, np.ndarray, np.ndarray):
         img_path, img_0 = self.read_action(idx)
 
         # Padded resize
@@ -31,8 +30,7 @@ class BaseInputDataLoader:
         img /= 255.0
         return img_path, img, img_0
 
-    @staticmethod
-    def read_action(idx) -> (str, np.ndarray):
+    def read_action(self, idx) -> (str, np.ndarray):
         return '', np.ndarray
 
     def __iter__(self):
@@ -79,3 +77,14 @@ def letterbox(img,
     img = cv2.copyMakeBorder(img, top, bottom, left, right,
                              cv2.BORDER_CONSTANT, value=color)
     return img, ratio, dw, dh
+
+
+from .loader_image import ImageDataLoader
+from .loader_video import VideoDataLoader
+from .loader_address import AddressDataLoader
+
+loader_factory = {
+    EInputDataType.Image.name: ImageDataLoader,
+    EInputDataType.Video.name: VideoDataLoader,
+    EInputDataType.Address.name: AddressDataLoader,
+}

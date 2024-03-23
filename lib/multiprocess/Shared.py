@@ -47,12 +47,15 @@ class SharedList:
         self.mp_list.insert(idx, data)
 
     def read(self, idx: int) -> any:
-        return self.mp_list[idx]
+        try:
+            return self.mp_list[idx]
+        except IndexError:
+            return None
 
     def pop(self, key: any) -> any:
         try:
             return self.mp_list.pop(key)
-        except KeyError:
+        except IndexError:
             return None
 
 

@@ -13,13 +13,13 @@ from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
 from lib.tracker.utils.utils import mkdir_if_missing
 from lib.multiprocess.MP_Tracker import TrackerProcess
-from lib.multiprocess.MP_ImageReceiver import ImageReceiverProcess
+from lib.multiprocess.MP_ImageLoader import ImageLoaderProcess
 from lib.multiprocess.MP_PathPredict import PathPredictProcess
 import lib.multiprocess.Shared as Sh
 from lib.multiprocess.Shared import ESharedDictType
 from lib.multiprocess import EMultiprocess
 from lib.predictor.spline.hermite_spline import HermiteSpline
-import lib.multiprocess.MP_PostIdMatch as MP_Post
+from lib.multiprocess.MP_GlobalIdMatch import GlobalIdMatchProcess
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -168,7 +168,8 @@ def track(opt_data):
     container_multiprocess = {
         EMultiprocess.ImageReceiver: {},
         EMultiprocess.Tracker: {},
-        EMultiprocess.Predictor: {}
+        EMultiprocess.Predictor: {},
+        EMultiprocess.GlobalMatching: GlobalIdMatchProcess,
     }
 
     container_shared_dict = {
@@ -194,22 +195,29 @@ def track(opt_data):
         shared_dict_predict = Sh.SharedDict()
         container_shared_dict[ESharedDictType.Predict][model_index] = shared_dict_predict
 
-        if opt_data.input_mode == 'Address':
-            main_logger.info('-' * 5 + f'Setting Image Receiver Sub-Processor {model_index}')
-            img_receiver = ImageReceiverProcess(model_index, opt_data, container_shared_dict)
-            container_multiprocess[EMultiprocess.ImageReceiver][model_index] = img_receiver
+        main_logger.info('-' * 5 + f'Setting Image Loader Sub-Processor {model_index}')
+        img_loader = ImageLoaderProcess(model_index, opt_data, container_shared_dict)
+        container_multiprocess[EMultiprocess.ImageReceiver][model_index] = img_loader
+        img_loader.start()
 
         main_logger.info('-' * 5 + f'Setting Tracker Sub-Processor {model_index}')
         tracker = TrackerProcess(model_index, opt_data, container_shared_dict)
         container_multiprocess[EMultiprocess.Tracker][model_index] = tracker
+        tracker.start()
 
         main_logger.info('-' * 5 + f'Setting Predictor Sub-Processor {model_index}')
         path_predictor = PathPredictProcess(HermiteSpline, model_index, opt_data, container_shared_dict,)
         container_multiprocess[EMultiprocess.Predictor][model_index] = path_predictor
+        path_predictor.start()
 
-    p: ImageReceiverProcess
+    main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
+    global_id_matchor = GlobalIdMatchProcess(0, opt_data, container_shared_dict)
+    container_multiprocess[EMultiprocess.GlobalMatching] = global_id_matchor
+    global_id_matchor.start()
+
+    p: ImageLoaderProcess
     for i, p in container_multiprocess[EMultiprocess.ImageReceiver].items():
-        main_logger.info('-' * 5 + f'Start Image Receiver Sub-Process No.{i}')
+        main_logger.info('-' * 5 + f'Start Image Loader Sub-Process No.{i}')
         p.process_run_action()
 
     p: TrackerProcess
@@ -221,6 +229,8 @@ def track(opt_data):
     for i, p in container_multiprocess[EMultiprocess.Predictor].items():
         main_logger.info('-' * 5 + f'Start Predictor Sub-Process No.{i}')
         p.process_run_action()
+
+    container_multiprocess[EMultiprocess.GlobalMatching].process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:

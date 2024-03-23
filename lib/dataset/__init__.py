@@ -6,11 +6,9 @@ import random
 import copy
 import time
 import warnings
-import traceback
 
 import cv2
 import numpy as np
-from socket import *
 import multiprocessing
 
 from collections import OrderedDict, defaultdict
@@ -18,9 +16,8 @@ from lib.utils.logger import ALL_LoggerContainer
 from lib.utils.image import gaussian_radius, draw_umich_gaussian
 from lib.utils.utils import xyxy2xywh
 from lib.model.model_config import E_arch_position, E_model_part_input_info
-from lib.dataset.utils.utils import create_gamma_img, clear_socket_buffer
 import lib.multiprocess.Shared as Sh
-from  lib.multiprocess.MP_ImageReceiver import EImageInfo
+from lib.multiprocess.MP_ImageLoader import EImageInfo
 
 def letterbox(img,
               height=608,
