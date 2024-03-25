@@ -148,6 +148,14 @@ class opts(object):
                                  help='filter out tiny boxes')
 
         # post
+        self.parser.add_argument('--text_result_name',
+                                 type=str,
+                                 default='text_result',
+                                 help='text result saving directory name')
+        self.parser.add_argument('--frame_dir',
+                                 type=str,
+                                 default='frame',
+                                 help='image saving directory name')
         self.parser.add_argument('--post_mode',
                                  type=str,
                                  default='None',

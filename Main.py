@@ -1,6 +1,8 @@
-import multiprocessing
+import ctypes
+import multiprocessing as mp
 import os
 import sys
+from enum import Enum, unique
 import torch
 import json
 import torch.utils.data
@@ -15,16 +17,21 @@ from lib.tracker.utils.utils import mkdir_if_missing
 from lib.multiprocess.MP_Tracker import TrackerProcess
 from lib.multiprocess.MP_ImageLoader import ImageLoaderProcess
 from lib.multiprocess.MP_PathPredict import PathPredictProcess
-import lib.multiprocess.Shared as Sh
-from lib.multiprocess.Shared import ESharedDictType
 from lib.multiprocess import EMultiprocess
 from lib.predictor.spline.hermite_spline import HermiteSpline
 from lib.multiprocess.MP_GlobalIdMatch import GlobalIdMatchProcess
+from lib.multiprocess.MP_IndiPost import IndividualPostProcess
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
 MAIN_PROCESS_NAME = 'Argus-MainProcess'
 TENSORBOARD_WRITER_NAME = 'Argus-Train-TensorboardWriter'
+
+@unique
+class EQueueType(Enum):
+    InputToTracker = 1
+    TrackerToPredict = 2
+    PredictToGlobalMatch = 3
 
 
 def train(opt_data):
@@ -101,7 +108,7 @@ def train(opt_data):
     trainer = BaseTrainer(opt=opt_data, model=model, optimizer=optimizer)
     trainer.set_device(opt_data.gpus, opt_data.chunk_sizes, opt_data.device)
 
-    ALL_LoggerContainer.dump_cfg(multiprocessing.current_process().name, model.cfg)
+    ALL_LoggerContainer.dump_cfg(mp.current_process().name, model.cfg)
 
     main_logger.info('-' * 5 + 'Starting training...')
     for epoch in range(start_epoch + 1, start_epoch + opt_data.num_epochs + 1):
@@ -169,50 +176,86 @@ def track(opt_data):
         EMultiprocess.ImageReceiver: {},
         EMultiprocess.Tracker: {},
         EMultiprocess.Predictor: {},
-        EMultiprocess.GlobalMatching: GlobalIdMatchProcess,
+        EMultiprocess.IndiPost: {},
+        EMultiprocess.GlobalMatching: {},
     }
 
-    container_shared_dict = {
-        ESharedDictType.Image_Input_List: {},
-        ESharedDictType.Image_Current: {},
-        ESharedDictType.Track: {},
-        ESharedDictType.Predict: {}
+    container_queue = {
+        EQueueType.InputToTracker: {},
+        EQueueType.TrackerToPredict: {},
+        EQueueType.PredictToGlobalMatch: {}
+    }
+
+    container_end_run_flag = {int: mp.Value}
+
+    container_result_shared_dict = {
+        EMultiprocess.ImageReceiver: {},
+        EMultiprocess.Tracker: {},
+        EMultiprocess.Predictor: {},
+    }
+
+    container_multiprocess_dir = {
+        EMultiprocess.Tracker: {},
+        EMultiprocess.Predictor: {},
     }
 
     sub_processor_num = len(opt_data.input_path)
 
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
     for model_index in range(sub_processor_num):
-        shared_list_image_input = Sh.SharedList()
-        container_shared_dict[ESharedDictType.Image_Input_List][model_index] = shared_list_image_input
+        queue_image_input = mp.Queue()
+        container_queue[EQueueType.InputToTracker][model_index] = queue_image_input
 
-        shared_dict_image_current = Sh.SharedDict()
-        container_shared_dict[ESharedDictType.Image_Current][model_index] = shared_dict_image_current
+        queue_track = mp.Queue()
+        container_queue[EQueueType.TrackerToPredict][model_index] = queue_track
 
-        shared_dict_track = Sh.SharedDict()
-        container_shared_dict[ESharedDictType.Track][model_index] = shared_dict_track
+        queue_predict = mp.Queue
+        container_queue[EQueueType.PredictToGlobalMatch][model_index] = queue_predict
 
-        shared_dict_predict = Sh.SharedDict()
-        container_shared_dict[ESharedDictType.Predict][model_index] = shared_dict_predict
+        end_run_flag = mp.Value(ctypes.c_bool, False)
+        container_end_run_flag[model_index] = end_run_flag
+
+        track_result_shared_dict = mp.Manager().dict()
+        predict_result_shared_dict = mp.Manager().dict()
+        container_result_shared_dict[EMultiprocess.Tracker] = track_result_shared_dict
+        container_result_shared_dict[EMultiprocess.Predictor] = predict_result_shared_dict
 
         main_logger.info('-' * 5 + f'Setting Image Loader Sub-Processor {model_index}')
-        img_loader = ImageLoaderProcess(model_index, opt_data, container_shared_dict)
+        img_loader = ImageLoaderProcess(
+            model_index, opt_data, container_queue, container_result_shared_dict, end_run_flag
+        )
         container_multiprocess[EMultiprocess.ImageReceiver][model_index] = img_loader
         img_loader.start()
 
         main_logger.info('-' * 5 + f'Setting Tracker Sub-Processor {model_index}')
-        tracker = TrackerProcess(model_index, opt_data, container_shared_dict)
+        tracker = TrackerProcess(
+            model_index, opt_data, container_queue, container_result_shared_dict, end_run_flag
+        )
         container_multiprocess[EMultiprocess.Tracker][model_index] = tracker
         tracker.start()
 
         main_logger.info('-' * 5 + f'Setting Predictor Sub-Processor {model_index}')
-        path_predictor = PathPredictProcess(HermiteSpline, model_index, opt_data, container_shared_dict,)
+        path_predictor = PathPredictProcess(
+            HermiteSpline,
+            model_index, opt_data, container_queue, container_result_shared_dict, end_run_flag
+        )
         container_multiprocess[EMultiprocess.Predictor][model_index] = path_predictor
-        # path_predictor.start()
+        path_predictor.start()
 
-    main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
-    global_id_matchor = GlobalIdMatchProcess(0, opt_data, container_shared_dict)
-    container_multiprocess[EMultiprocess.GlobalMatching] = global_id_matchor
+        container_multiprocess_dir[EMultiprocess.Tracker][model_index] = tracker.main_output_dir
+        container_multiprocess_dir[EMultiprocess.Predictor][model_index] = img_loader.main_output_dir
+
+        main_logger.info('-' * 5 + f'Setting Individual PostProcess Sub-Processor {model_index}')
+        indi_post = IndividualPostProcess(
+            container_multiprocess_dir,
+            model_index, opt_data, container_queue, container_result_shared_dict, end_run_flag
+        )
+        container_multiprocess[EMultiprocess.IndiPost][model_index] = indi_post
+        indi_post.start()
+
+    # main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
+    # global_id_matchor = GlobalIdMatchProcess(0, opt_data, container_queue)
+    # container_multiprocess[EMultiprocess.GlobalMatching][0] = global_id_matchor
     # global_id_matchor.start()
 
     p: ImageLoaderProcess
@@ -230,13 +273,17 @@ def track(opt_data):
         main_logger.info('-' * 5 + f'Start Predictor Sub-Process No.{i}')
         p.process_run_action()
 
-    # container_multiprocess[EMultiprocess.GlobalMatching].process_run_action()
+    container_multiprocess[EMultiprocess.GlobalMatching][0].process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
         for i, p in container_multiprocess[EMultiprocess.Tracker].items():
             b_check_tracker = b_check_tracker or p.is_alive()
+
+    for model_index in range(sub_processor_num):
+        end_run_flag = container_end_run_flag[model_index]
+        end_run_flag.value = True
 
     for i, each in container_multiprocess[EMultiprocess.Predictor].items():
         each.terminate()
@@ -249,9 +296,8 @@ def track(opt_data):
 
 if __name__ == '__main__':
     opt = opts().init()
-    # Set available GPU index
 
-    multiprocessing.current_process().name = MAIN_PROCESS_NAME
+    mp.current_process().name = MAIN_PROCESS_NAME
 
     main_logger = ALL_LoggerContainer.add_logger(MAIN_PROCESS_NAME)
     ALL_LoggerContainer.add_stream_handler(MAIN_PROCESS_NAME)

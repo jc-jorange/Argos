@@ -1,12 +1,11 @@
 import time
 from enum import Enum, unique
+import cv2
+import os
 
-import numpy as np
-
-from ..multiprocess import BaseProcess, ESharedDictType
-from lib.input_data_loader import EInputDataType, loader_factory
-import lib.multiprocess.Shared as Sh
-from multiprocessing import Queue
+from ..multiprocess import BaseProcess, EMultiprocess
+from lib.input_data_loader import EInputDataType, loader_factory, BaseInputDataLoader
+from Main import EQueueType
 
 
 @unique
@@ -17,17 +16,21 @@ class EImageInfo(Enum):
 
 class ImageLoaderProcess(BaseProcess):
     prefix = 'Argus-SubProcess-ImageLoader_'
+    dir_name = 'input'
 
     def __init__(self,
                  *args,
                  **kwargs,
                  ):
         super(ImageLoaderProcess, self).__init__(*args, **kwargs)
-        self.making_process_main_save_dir('camera_raw_')
+
+        self.frame_dir = None if self.opt.output_format == 'text' \
+            else self.making_dir(self.main_output_dir, self.opt.frame_dir)
+
+        self.data_loader = None
 
         self.path = self.opt.input_path[self.idx]
         self.loader_mode = self.opt.input_mode
-        self.data_loader = None
 
         self.load_time = 0.0
 
@@ -138,23 +141,30 @@ class ImageLoaderProcess(BaseProcess):
             self.logger.info(f'Start Loading Video in {self.path}')
         if self.loader_mode == EInputDataType.Address:
             self.logger.info(f'Start Loading From Camera in {self.path}')
-        self.data_loader = loader_factory[self.loader_mode](self.path)
+        self.data_loader: BaseInputDataLoader = loader_factory[self.loader_mode](self.path)
 
     def run_action(self) -> None:
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        for path, img, img_0 in self.data_loader:
-            if path:
-                self.container_shared_dict[ESharedDictType.Image_Input_List][self.idx].append((path, img, img_0))
+        input_queue = self.container_queue[EQueueType.InputToTracker][self.idx]
+        for input_data in self.data_loader:
+            input_queue.put(input_data)
+            if self.frame_dir:
+                cv2.imwrite(os.path.join(self.frame_dir, '{:05d}.jpg'.format(self.data_loader.count)), input_data[2])
+
+        input_queue.put(None)
 
         end_time = time.perf_counter()
         self.load_time = end_time - start_time
 
     def run_end(self) -> None:
         super().run_end()
+
         self.logger.info(
             f"Total receive {self.data_loader.count} frames in {self.load_time} s"
         )
+
+        self.container_result[EMultiprocess.ImageReceiver][self.idx] = self.frame_dir
 
         self.logger.info('-' * 5 + 'Image Receiver Finished' + '-' * 5)
