@@ -191,7 +191,6 @@ class DLA(BaseModel_backbone):
         return nn.Sequential(*modules)
 
     def forward(self, x):
-        t_s = time.perf_counter()
         y = []
         if self.coord_conv:
             x = self.coord_conv(x)
@@ -199,9 +198,6 @@ class DLA(BaseModel_backbone):
         for i in range(6):
             x = getattr(self, 'level{}'.format(i))(x)
             y.append(x)
-        t_e = time.perf_counter()
-        t = t_e-t_s
-        print('DLA Backbone Time: {}'.format(t))
         return y
 
     def load_pretrained_model(self, data='imagenet', name='dla34', hash='ba72cf86'):

@@ -15,7 +15,8 @@ import math
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
-from dcn_v2 import DCN
+# from dcn_v2 import DCN
+from mmcv.ops import DeformConv2dPack as DCN
 from .. import BaseModel_backbone_with_neck
 
 BN_MOMENTUM = 0.1

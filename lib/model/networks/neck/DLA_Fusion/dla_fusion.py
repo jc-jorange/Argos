@@ -7,7 +7,8 @@ from .. import BaseModel_neck
 
 import numpy as np
 import math
-from dcn_v2 import DCN
+# from dcn_v2 import DCN
+from mmcv.ops import DeformConv2dPack as DCN
 
 from lib.model.networks.module.ghost_module import GhostBottleneck
 from lib.model.networks.module.Squeeze_and_Excitation import SELayer

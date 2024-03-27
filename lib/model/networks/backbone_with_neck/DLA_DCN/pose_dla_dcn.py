@@ -12,7 +12,8 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from torch import nn
 
-from dcn_v2 import DCN
+from mmcv.ops import DeformConv2dPack as DCN
+# from dcn_v2 import DCN
 # from lib.models.networks.DCNv2.dcn_v2 import DCN
 
 from .. import BaseModel_backbone_with_neck
