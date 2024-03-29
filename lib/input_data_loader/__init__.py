@@ -10,31 +10,32 @@ class EInputDataType(Enum):
     Address = 3
 
 class BaseInputDataLoader:
-    def __init__(self, path: str):
+    def __init__(self, path: str, net_input_shape: tuple):
         self.data_path = path
+        self.net_input_shape = net_input_shape
 
         self.image_shape = (0, 0)
         self.len = 0
 
         self.count = 0
 
-    def read_image(self, idx) -> (str, np.ndarray, np.ndarray):
+    def read_image(self, idx) -> (str, np.ndarray, tuple):
         img_path, img_0 = self.read_action(idx)
 
         # Padded resize
-        img, _, _, _ = letterbox(img_0)
+        img, _, _, _ = letterbox(img_0, self.net_input_shape)
 
         # Normalize RGB
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img, dtype=np.float32)
         img /= 255.0
+
         return img_path, img, img_0
 
     def read_action(self, idx) -> (str, np.ndarray):
         return '', np.ndarray
 
     def __iter__(self):
-        self.count = -1
         return self
 
     def __next__(self):
@@ -50,17 +51,16 @@ class BaseInputDataLoader:
 
 
 def letterbox(img,
-              height=608,
-              width=1088,
+              target_shape=(3, 608, 1088),
               color=(127.5, 127.5, 127.5)):
     """
     resize a rectangular image to a padded rectangular
     :param img:
-    :param height:
-    :param width:
+    :param target_shape:
     :param color:
     :return:
     """
+    channels, height, width = target_shape
     shape = img.shape[:2]  # shape = [height, width]
     ratio = min(float(height) / shape[0], float(width) / shape[1])
 

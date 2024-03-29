@@ -1,11 +1,14 @@
 import time
+import traceback
 from enum import Enum, unique
 import cv2
 import os
+import numpy as np
+import torch
 
-from ..multiprocess import BaseProcess, EMultiprocess
+from ..multiprocess import BaseProcess
+from .SharedMemory import EQueueType
 from lib.input_data_loader import EInputDataType, loader_factory, BaseInputDataLoader
-from Main import EQueueType
 
 
 @unique
@@ -17,6 +20,7 @@ class EImageInfo(Enum):
 class ImageLoaderProcess(BaseProcess):
     prefix = 'Argus-SubProcess-ImageLoader_'
     dir_name = 'input'
+    log_name = 'Image_Loader_Log'
 
     def __init__(self,
                  *args,
@@ -34,105 +38,10 @@ class ImageLoaderProcess(BaseProcess):
 
         self.load_time = 0.0
 
-    # def read_image(self):
-    #     img = None
-    #     bReadResult = False
-    #     start_time = time.perf_counter()
-    #
-    #     if self.connect_type == 'UDP':
-    #         self.ConnectionSocket.setblocking(False)
-    #         self.ConnectionSocket.settimeout(1)
-    #         try:
-    #             clip_num = 64000
-    #             flag_data, address = self.ConnectionSocket.recvfrom(4 + 4 + 4 + 8)
-    #             if flag_data and "I///" in flag_data.decode("utf-8", "ignore"):
-    #                 flag = flag_data
-    #                 self.width = int(flag[4:8])
-    #                 self.height = int(flag[8:12])
-    #                 data_count_total = int(flag[12:20])
-    #                 data_count = 0
-    #                 img_bytes = b''
-    #
-    #                 if data_count_total > 0:
-    #                     total_count = data_count_total // clip_num
-    #                     left = data_count_total % clip_num
-    #                     for i in range(total_count):
-    #                         data, address = self.ConnectionSocket.recvfrom(clip_num)
-    #                         img_bytes += data
-    #                         data_count += len(data)
-    #                     if left > 0:
-    #                         data, address = self.ConnectionSocket.recvfrom(left)
-    #                         img_bytes += data
-    #                         data_count += len(data)
-    #
-    #                     try:
-    #                         img = np.asarray(bytearray(img_bytes))
-    #                         img = cv2.imdecode(img, cv2.IMREAD_COLOR) # BGR
-    #                         img = create_gamma_img(3, img)
-    #                         # self.img_0 = img
-    #                         self.logger.info(
-    #                             "UDP receive image at {}".format(datetime.datetime.now()))
-    #                         bReadResult = True
-    #                     except:
-    #                         pass
-    #         except timeout:
-    #             self.keep_process = False
-    #         except OSError:
-    #             self.keep_process = False
-    #             pass
-    #
-    #     elif self.connect_type == 'TCP':
-    #         # self.ConnectionSocket.setblocking(False)
-    #         # clear_socket_buffer(self.ConnectionSocket, 1)
-    #         # self.ConnectionSocket.setblocking(True)
-    #         try:
-    #             data = self.ConnectionSocket.recv(4)
-    #             # print(data.decode("utf-8", "ignore"))
-    #             if b'\x00\x00' in data:
-    #                 # self.keep_process = False
-    #                 pass
-    #             if data and data.decode("utf-8", "ignore") == "I///":
-    #                 start_time = time.perf_counter()
-    #                 flag_data = self.ConnectionSocket.recv(4+4+8)
-    #                 flag = flag_data.decode("utf-8", "ignore")
-    #                 self.width = int(flag[0:4])
-    #                 self.height = int(flag[4:8])
-    #                 data_count_total = int(flag[8:16])
-    #                 data_count = 0
-    #                 img_bytes = b''
-    #
-    #                 if data_count_total > 0:
-    #                     while data_count < data_count_total:
-    #                         data = self.ConnectionSocket.recv(data_count_total)
-    #                         img_bytes += data
-    #                         data_count += len(data)
-    #
-    #                     img = np.asarray(bytearray(img_bytes))
-    #                     img = cv2.imdecode(img, cv2.IMREAD_COLOR) # BGR
-    #                     img = create_gamma_img(1.0, img)
-    #                     # self.img_0 = img
-    #                     # self.logger.info(
-    #                     #     "TCP receive image at {}".format(datetime.datetime.now()))
-    #                     bReadResult = True
-    #                 end_time = time.perf_counter()
-    #                 # print('only read image: {}'.format(end_time - start_time))
-    #             elif not data:
-    #                 self.keep_process = False
-    #         except Exception:
-    #             traceback.print_exc()
-    #             self.keep_process = False
-    #
-    #     self.total_frames += 1
-    #
-    #     end_time = time.perf_counter()
-    #     recv_time = end_time - start_time
-    #     self.logger.debug("Receive {} frame in time {} s".format(self.total_frames, recv_time))
-    #     return img, bReadResult
+        self.real_time_mode = False
 
     def run_begin(self) -> None:
         super(ImageLoaderProcess, self).run_begin()
-        self.set_logger_file_handler(self.name, self.main_output_dir)
-        self.logger.info(f"This is the Image Receiver Process No.{self.idx}")
 
         self.logger.info("Start Creating Input Dataloader")
         if self.loader_mode == EInputDataType.Image:
@@ -141,30 +50,49 @@ class ImageLoaderProcess(BaseProcess):
             self.logger.info(f'Start Loading Video in {self.path}')
         if self.loader_mode == EInputDataType.Address:
             self.logger.info(f'Start Loading From Camera in {self.path}')
-        self.data_loader: BaseInputDataLoader = loader_factory[self.loader_mode](self.path)
+        self.data_loader: BaseInputDataLoader = loader_factory[self.loader_mode](self.path, self.opt.net_input_shape)
 
     def run_action(self) -> None:
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        input_queue = self.container_queue[EQueueType.InputToTracker][self.idx]
-        for input_data in self.data_loader:
-            input_queue.put(input_data)
-            if self.frame_dir:
-                cv2.imwrite(os.path.join(self.frame_dir, '{:05d}.jpg'.format(self.data_loader.count)), input_data[2])
+        input_queue = self.shared_container.queue_dict[EQueueType.LoadResultSend]
 
-        input_queue.put(None)
+        try:
+            for path, img, img_0 in self.data_loader:
+                if not self.opt.realtime:
+                    while input_queue.qsize() > self.opt.load_buffer:
+                        pass
+                    img_send = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
+                    input_queue.put((self.data_loader.count, img_send, img_0.shape))
+
+                self.shared_container.set_data(img)
+                self.shared_container.input_frame_id.value = self.data_loader.count
+                self.shared_container.set_origin_shape(img_0.shape)
+
+                if self.frame_dir:
+                    cv2.imwrite(
+                        os.path.join(self.frame_dir, '{:05d}.jpg'.format(self.data_loader.count)),
+                        img_0
+                    )
+
+        except:
+            traceback.print_exc()
+            pass
+
+        while not input_queue.empty():
+            pass
+
+        self.shared_container.b_input_loading.value = False
 
         end_time = time.perf_counter()
         self.load_time = end_time - start_time
 
     def run_end(self) -> None:
-        super().run_end()
-
         self.logger.info(
             f"Total receive {self.data_loader.count} frames in {self.load_time} s"
         )
 
-        self.container_result[EMultiprocess.ImageReceiver][self.idx] = self.frame_dir
+        super().run_end()
 
         self.logger.info('-' * 5 + 'Image Receiver Finished' + '-' * 5)

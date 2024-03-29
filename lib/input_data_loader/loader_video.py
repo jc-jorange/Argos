@@ -13,9 +13,9 @@ class VideoDataLoader(BaseInputDataLoader):
 
     def __next__(self):
         super(VideoDataLoader, self).__next__()
-        if self.count == len(self):
+        if self.count >= len(self):
             raise StopIteration
-        return self.read_image(self.count)
+        return self.read_image(self.count - 1)
 
     def read_action(self, idx) -> (str, np.ndarray):
         img_path = str(idx)

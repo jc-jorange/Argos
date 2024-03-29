@@ -13,16 +13,7 @@ class HermiteSpline(BaseSpline):
         ]
 
     def can_process_predict(self) -> bool:
-        return len(self.p0_list) == 3
-
-    def set_new_base(self, point) -> S_point:
-        t = time.perf_counter()
-        if self.can_process_predict():
-            self.process_geometrical_constraint_matrix()
-            return super(HermiteSpline, self).set_new_base(point)
-        else:
-            self.p0_list.append(point)
-            self.time_list.append(t)
+        return len(self.p0_list) >= 3
 
     def process_geometrical_constraint_matrix(self) -> None:
         raw_0 = torch.tensor(self.p0_list[-3])

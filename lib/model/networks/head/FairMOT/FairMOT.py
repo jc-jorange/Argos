@@ -53,13 +53,9 @@ class FairMOT(BaseModel_head):
             self.__setattr__(head, head_out)
 
     def forward(self, x: list):
-        t_s = time.perf_counter()
         ret = {}
         for head in self.heads:
             ret[head] = self.__getattr__(head)(x[-1])
-        t_e = time.perf_counter()
-        t = t_e - t_s
-        print('FairMOT Head Time: {}'.format(t))
         return [ret]
 
     def set_heads(self, num_classes, id_dim, cat_spec_wh, reg_offset):

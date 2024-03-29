@@ -1,43 +1,34 @@
 import ctypes
 import os
-from multiprocessing import Process, Queue, Value
+from multiprocessing import Process, Value
 from enum import Enum, unique
-from typing import Dict
 
 from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
 from lib.tracker.utils.utils import mkdir_if_missing
-from Main import EQueueType
-
-FRAME_DIR_NAME = 'frame'
-
-
-@unique
-class EMultiprocess(Enum):
-    ImageReceiver = 1
-    Tracker = 2
-    Predictor = 3
-    IndiPost = 4
-    GlobalMatching = 5
+import lib.postprocess.utils.write_result as wr
+from lib.multiprocess.SharedMemory import SharedContainer
 
 
 class BaseProcess(Process):
     prefix = ''
     dir_name = ''
+    log_name = ''
+    save_type = []
 
     def __init__(self,
+                 shared_container: SharedContainer,
                  idx: int,
                  opt: opts,
-                 container_queue: Dict[EQueueType, Dict[int, Queue]],
-                 container_result_dict: Dict[EMultiprocess, Dict[int, any]],
-                 end_run_flag_shared_value: Value
                  ) -> None:
         super(BaseProcess, self).__init__()
+        self.check_save_type(self.save_type)
 
+        self.shared_container = shared_container
         self.idx = idx
         self.opt = opt
-        self.container_queue = container_queue
-        self.container_result = container_result_dict
+
+        self.all_frame_results = wr.S_default_result
 
         self.name = self.prefix + str(idx)
 
@@ -45,11 +36,11 @@ class BaseProcess(Process):
 
         self.main_output_dir = self.making_dir(self.opt.save_dir, str(self.idx + 1), self.dir_name)
 
-        self.end_run_flag = end_run_flag_shared_value
         self.b_keep_hold = Value(ctypes.c_bool, True)
 
     def run_begin(self) -> None:
-        ...
+        self.set_logger_file_handler(self.name + self.log_name, self.main_output_dir)
+        self.logger.info(f'This is {self.name} Process')
 
     def process_run_action(self) -> None:
         self.b_keep_hold.value = False
@@ -61,15 +52,16 @@ class BaseProcess(Process):
         ...
 
     def run_end(self) -> None:
-        ...
+        self.final_save()
 
     def run(self) -> None:
         super(BaseProcess, self).run()
 
         self.logger = ALL_LoggerContainer.add_logger(self.name)
         ALL_LoggerContainer.add_stream_handler(self.name)
-        ALL_LoggerContainer.set_logger_level(self.name, 'debug' if self.opt.debug else 'info')
-        self.logger.info('set log level from "debug" to "info" ')
+        log_level = 'debug' if self.opt.debug else 'info'
+        ALL_LoggerContainer.set_logger_level(self.name, log_level)
+        self.logger.info(f'set log level to {log_level}')
 
         self.run_begin()
 
@@ -87,5 +79,45 @@ class BaseProcess(Process):
 
         return str(new_dir)
 
+    @staticmethod
+    def check_save_type(save_list: list) -> None:
+        duplicates = []
+        for element in save_list:
+            if element not in wr.E_text_result_type:
+                duplicates.append(element)
+        if duplicates:
+            alias_details = ', '.join(["%s" % name for name in duplicates])
+            raise ValueError('Not valid save type: %s' % alias_details)
+
     def set_logger_file_handler(self, log_name: str, log_dir: str) -> None:
         ALL_LoggerContainer.add_file_handler(self.name, log_name, log_dir)
+
+    def final_save(self):
+        for each_type in self.save_type:
+            self.logger.info(f'Saving {each_type.name} result in {self.main_output_dir}')
+            wr.write_results_to_text(
+                self.main_output_dir,
+                self.all_frame_results,
+                each_type
+            )
+
+@unique
+class EMultiprocess(Enum):
+    ImageLoader = 1
+    Tracker = 2
+    Predictor = 3
+    IndiPost = 4
+    GlobalMatching = 5
+
+
+from .MP_ImageLoader import ImageLoaderProcess
+from .MP_Tracker import TrackerProcess
+from .MP_PathPredict import PathPredictProcess
+from .MP_IndiPost import IndividualPostProcess
+
+
+process_factory = {
+    EMultiprocess.ImageLoader: ImageLoaderProcess,
+    EMultiprocess.Tracker: TrackerProcess,
+    EMultiprocess.Predictor: PathPredictProcess,
+}

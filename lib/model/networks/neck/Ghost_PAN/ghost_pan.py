@@ -252,7 +252,6 @@ class GhostPAN(BaseModel_neck):
             tuple[Tensor]: multi level features.
         """
         # inputs = inputs[-3:]
-        t_s = time.perf_counter()
         inputs = inputs if len(inputs)<self.max_layers else inputs[-self.max_layers:]
         assert len(inputs) == len(self.in_channels)
 
@@ -297,7 +296,4 @@ class GhostPAN(BaseModel_neck):
             outs.append(extra_in_layer(inputs[-1]) + extra_out_layer(outs[-1]))
 
         outs.reverse()
-        t_e = time.perf_counter()
-        t = t_e - t_s
-        print('GhostPAN Neck Time: {}'.format(t))
         return tuple(outs)

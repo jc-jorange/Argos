@@ -1,23 +1,31 @@
 import os
 import cv2
 import numpy as np
-import typing as typ
+from enum import Enum, unique
 
-Track_Result_Format = typ.Dict[  # track result
-                int, typ.Dict[  # class:
-                    int, typ.Tuple[  # id:
-                        typ.Tuple, float  # tlwh or centerxy, score
-                    ]
-                ]
-            ]
+# {frame: {subframe: ({class: {ID: ((tlwh), score)}}, fps)}}
+S_default_result = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
 
-Total_Result_Format = typ.Dict[
-    int, typ.Dict[  # frame:
-        int, typ.Tuple[  # subframe:
-            Track_Result_Format, float  # fps
-        ]
-    ]
-]
+@unique
+class E_text_result_type(Enum):
+    raw = 1
+    mot = 2
+    kitti = 3
+
+
+Dict_text_result_name = {
+    E_text_result_type.raw: 'result_raw.txt',
+    E_text_result_type.mot: 'result_mot.txt',
+    E_text_result_type.kitti: 'result_kitti.txt',
+}
+
+Dict_text_result_format = {
+    E_text_result_type.raw: '{frame},{subframe},{cls_id},{id},{x1},{y1},{x2},{y2},{score},{fps}\n',
+    E_text_result_type.mot: '{frame},{id},{x1},{y1},{x2},{y2},{score},{cls_id},1\n',
+    E_text_result_type.kitti: '{frame} {id} pedestrian 0 0 -10 {x1} {y1} {x2} {y2} -10 -10 -10 -1000 -1000 -1000 -10\n',
+}
+
+Str_video_result_name = 'video_result.mp4'
 
 
 def get_color(i_class: int, idx: int) -> tuple:
@@ -35,15 +43,15 @@ def get_color(i_class: int, idx: int) -> tuple:
 
 def plot_tracks(
         image,
-        result_by_class: Track_Result_Format,
+        result_frame: dict,
         frame: int,
-        fps: float,
 ):
     """
     :rtype:
     :param image:
     :param result_by_class:
     :param frame:
+    :param subframe:
     :param fps:
     :return:
     """
@@ -51,117 +59,144 @@ def plot_tracks(
     img = np.ascontiguousarray(np.copy(image))
 
     text_scale = max(1.0, image.shape[1] / 1200.)  # 1600.
-    text_thickness = 2  # 自定义ID文本线宽
-    line_thickness = max(1, int(image.shape[1] / 500.))
+    text_thickness = 1  # 自定义ID文本线宽
+    line_thickness = max(2, int(image.shape[1] / 500.))
+
+    subframe_total = list(result_frame.keys())[-1] if len(list(result_frame.keys())) > 0 else 0
+    fps = result_frame[0][1] if subframe_total >= 0 else 0.0
 
     cv2.putText(
         img,
-        'frame: %d fps: %.2f' % (frame, fps),
+        'frame: %d + %d fps: %.2f' % (frame, subframe_total, fps),
         (0, int(15 * text_scale)),
         cv2.FONT_HERSHEY_PLAIN,
         text_scale,
         (0, 0, 255),
-        thickness=2
+        thickness=1
     )
 
-    for i_class, result_by_id in result_by_class.items():
-        for i_id, result in result_by_id.items():
-            tlwh, score = result
+    result_last_subframe = {}
+    for each_subframe, result_subframe in result_frame.items():
+        result_class = result_subframe[0]
+        fps = result_subframe[1]
+        for i_class, result_by_id in result_class.items():
+            for i_id, result in result_by_id.items():
+                tlwh, score = result
 
-            x1, y1, w, h = tlwh
-            int_box = tuple(map(int, (x1, y1, x1 + w, y1 + h)))  # x1, y1, x2, y2
-            id_text = '{}'.format(i_id)
+                x1, y1, w, h = tlwh
+                int_box = tuple(map(int, (x1, y1, x1 + w, y1 + h)))  # x1, y1, x2, y2
+                id_text = '{}'.format(i_id)
 
-            color = get_color(i_class, i_id)
+                color = get_color(i_class, i_id)
 
-            # draw bbox
-            cv2.rectangle(
-                img=img,
-                pt1=int_box[0:2],  # (x1, y1)
-                pt2=int_box[2:4],  # (x2, y2)
-                color=color,
-                thickness=line_thickness
-                          )
+                if (w * h) > 0:
+                    # draw bbox
+                    cv2.rectangle(
+                        img=img,
+                        pt1=int_box[0:2],  # (x1, y1)
+                        pt2=int_box[2:4],  # (x2, y2)
+                        color=color,
+                        thickness=line_thickness
+                                  )
+                else:
+                    if result_last_subframe:
+                        last_result = result_last_subframe[i_class][i_id][0]
+                        last_point = (int(last_result[0]), int(last_result[1]))
+                        cv2.arrowedLine(
+                            img=img,
+                            pt1=int_box[0:2],
+                            pt2=last_point,
+                            color=color,
+                            thickness=line_thickness,
+                        )
+                    else:
+                        cv2.circle(
+                            img=img,
+                            center=int_box[0:2],
+                            radius=line_thickness*2,
+                            color=color,
+                            thickness=-1,
+                        )
 
-            # draw class name and index
-            cv2.putText(
-                img,
-                str(i_class),
-                (int(x1), int(y1)),
-                cv2.FONT_HERSHEY_PLAIN,
-                text_scale,
-                (0, 255, 255),  # cls_id: yellow
-                thickness=text_thickness
-            )
+                if each_subframe == 0:
+                    # draw class name and index
+                    cv2.putText(
+                        img,
+                        'class:' + str(i_class),
+                        (int(x1), int(y1)),
+                        cv2.FONT_HERSHEY_PLAIN,
+                        text_scale,
+                        (0, 255, 255),  # cls_id: yellow
+                        thickness=text_thickness
+                    )
 
-            txt_w, txt_h = cv2.getTextSize(
-                str(i_class),
-                fontFace=cv2.FONT_HERSHEY_PLAIN,
-                fontScale=text_scale, thickness=text_thickness
-            )
+                    txt_w, txt_h = cv2.getTextSize(
+                        str(i_class),
+                        fontFace=cv2.FONT_HERSHEY_PLAIN,
+                        fontScale=text_scale, thickness=text_thickness
+                    )
 
-            cv2.putText(
-                img,
-                id_text,
-                (int(x1), int(y1) - txt_h),
-                cv2.FONT_HERSHEY_PLAIN,
-                text_scale,
-                (0, 255, 255),  # cls_id: yellow
-                thickness=text_thickness
-            )
+                    cv2.putText(
+                        img,
+                        'id:' + id_text,
+                        (int(x1), int(y1) - 2 * txt_h),
+                        cv2.FONT_HERSHEY_PLAIN,
+                        text_scale,
+                        (0, 255, 255),  # cls_id: yellow
+                        thickness=text_thickness
+                    )
+        result_last_subframe = result_subframe[0]
 
     return img
 
 
-def write_results_to_text(file_name, results_dict: Total_Result_Format, data_type):
+def write_results_to_text(output_dir: str, results_dict: dict, data_type: E_text_result_type):
     """
-    :param file_name:
+    :param output_dir:
     :param results_dict:
     :param data_type:
     :return:
     """
-    if data_type == 'mot':
-        # save_format = '{frame},{id},{x1},{y1},{w},{h},1,-1,-1,-1\n'
-        # save_format = '{frame},{id},{x1},{y1},{w},{h},1,{cls_id},1\n'
-        save_format = '{frame},{id},{x1},{y1},{w},{h},{score},{cls_id},1\n'
-    elif data_type == 'kitti':
-        save_format = '{frame} {id} pedestrian 0 0 -10 {x1} {y1} {x2} {y2} -10 -10 -10 -1000 -1000 -1000 -10\n'
-    elif data_type == 'raw':
-        save_format = '{frame},{subframe},{cls_id},{id},{x1},{y1},{w},{h},{score},{fps}\n'
-    else:
-        raise ValueError(data_type)
+    try:
+        save_format = Dict_text_result_format[data_type]
+    except KeyError as e:
+        raise e
+
+    file_dir = os.path.join(output_dir, Dict_text_result_name[data_type])
 
     last_line = None
-    with open(file_name, 'w') as f:
+    with open(file_dir, 'w') as f:
         for frame, result_subframe in results_dict.items():
-            for subframe, result_and_fps in result_subframe.items():
-                result_class = result_and_fps[0]
-                fps = result_and_fps[1]
-                for i_class, result_id in result_class.items():
-                    for i_id, result in result_id.items():
-                        tlwh = result[0]
-                        score = result[1]
-                        if data_type == 'kitti':
-                            i_id -= 1
-                        x1, y1, w, h = tlwh
-                        # x2, y2 = x1 + w, y1 + h
-                        # line = save_format.format(frame=frame_id, id=track_id, x1=x1, y1=y1, x2=x2, y2=y2, w=w, h=h)
-                        line = save_format.format(
-                            frame=frame,
-                            subframe=subframe,
-                            cls_id=i_class,
-                            id=i_id,
-                            x1=x1, y1=y1, w=w, h=h,
-                            score=score,  # detection score
-                            fps=fps
-                        )
-                        if last_line != line:
-                            f.write(line)
+            if frame > 0:
+                for subframe, result_and_fps in result_subframe.items():
+                    result_class = result_and_fps[0]
+                    fps = result_and_fps[1]
+                    for i_class, result_id in result_class.items():
+                        for i_id, result in result_id.items():
+                            tlwh = result[0]
+                            score = result[1]
+                            # if data_type == 'kitti':
+                            #     i_id -= 1
+                            x1, y1, w, h = tlwh
+                            # x2, y2 = x1 + w, y1 + h
+                            line = save_format.format(
+                                frame=frame,
+                                subframe=subframe,
+                                cls_id=i_class,
+                                id=i_id,
+                                x1=x1, y1=y1, x2=w, y2=h,
+                                score=score,  # detection score
+                                fps=fps
+                            )
+                            if last_line != line:
+                                f.write(line)
 
 
 def write_results_to_video(result_root, frame_dir, video_type, frame_rate):
-    output_video_path = os.path.join(result_root, 'video_result.mp4')
-    ini_img = cv2.imread(os.path.join(frame_dir, os.listdir(frame_dir)[0]))
+    output_video_path = os.path.join(result_root, Str_video_result_name)
+    a = os.listdir(frame_dir)
+    ini_img_dir = os.path.join(frame_dir, os.listdir(frame_dir)[0])
+    ini_img = cv2.imread(ini_img_dir)
     res = (ini_img.shape[1], ini_img.shape[0])
     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*video_type), frame_rate, res)
     img_list = os.listdir(frame_dir)

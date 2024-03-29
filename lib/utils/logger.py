@@ -45,7 +45,7 @@ class Logger_Container:
 
     def add_file_handler(self, logger_name: str, log_filename: str, log_dir: str) -> None:
         self.log_dir_dict[logger_name] = log_dir
-        log_file = log_dir + '/' + log_filename + '_log.txt'
+        log_file = os.path.join(log_dir, log_filename + '_log.txt')
         file_handler = logging.FileHandler(filename=log_file, encoding='utf-8')
         file_handler.setFormatter(formatter)
         self.logger_dict[os.getpid()].addHandler(file_handler)

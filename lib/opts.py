@@ -90,6 +90,10 @@ class opts(object):
         self.parser.add_argument('--part_path',
                                  default='./lib/model/networks',
                                  help='model arch parts path')
+        self.parser.add_argument('--net_input_shape',
+                                 nargs='+',
+                                 default=[3, 608, 1088],  # [channels, height, width]
+                                 help='normalized input image shape of network in [channels, height, width] format')
 
         # train
         self.parser.add_argument('--lr',
@@ -125,7 +129,16 @@ class opts(object):
                                  default=0,
                                  help='number of epochs to run validation.')
 
+        self.parser.add_argument('--load_buffer',
+                                 type=int,
+                                 default=32,
+                                 help='image loader queue size')
+
         # tracking
+        self.parser.add_argument('--realtime',
+                                 type=bool,
+                                 default=False,
+                                 help='whether read image data in realtime')
         self.parser.add_argument('--conf_thres',
                                  type=float,
                                  default=0.4,  # 0.6, 0.4
@@ -144,8 +157,14 @@ class opts(object):
                                  help='tracking buffer')
         self.parser.add_argument('--min-box-area',
                                  type=float,
-                                 default=50,
+                                 default=10,
                                  help='filter out tiny boxes')
+
+        # path predict
+        self.parser.add_argument('--predictor_name',
+                                 type=str,
+                                 default='HermiteSpline',
+                                 help='predictor to use')
 
         # post
         self.parser.add_argument('--text_result_name',

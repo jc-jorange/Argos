@@ -393,10 +393,10 @@ class MCJDETracker(object):
 
         return dets_dict
 
-    def update_tracking(self, im_blob, img_0):
+    def update_tracking(self, im_blob, origin_shape):
         """
         :param im_blob:
-        :param img_0:
+        :param origin_shape:
         :return:
         """
         # update frame id
@@ -414,7 +414,7 @@ class MCJDETracker(object):
         removed_tracks_dict = defaultdict(list)
         output_tracks_dict = defaultdict(list)
 
-        height, width = img_0.shape[0], img_0.shape[1]  # H, W of original input image
+        height, width, channels = origin_shape  # H, W of original input image
         net_height, net_width = im_blob.shape[2], im_blob.shape[3]  # H, W of net input
 
         c = np.array([width * 0.5, height * 0.5], dtype=np.float32)

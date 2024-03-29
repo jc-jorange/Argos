@@ -21,11 +21,11 @@ class BasePredictor:
 
     def filter_close_track(self, point: S_point, t: float) -> {S_point}:
         predict_result = self.get_predicted_position(t)
-        try:
-            if predict_result.any():
-                predict_result = predict_result.numpy()
-        except AttributeError:
+        if isinstance(predict_result, np.ndarray):
+            predict_result = predict_result.numpy()
+        else:
             predict_result = np.zeros(point.shape)
+
         both = point * predict_result
         both = np.where(both > 0, 1, 0)
         m_track = np.where(both, 0, point)
