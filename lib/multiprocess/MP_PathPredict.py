@@ -40,8 +40,15 @@ class PathPredictProcess(BaseProcess):
         while self.shared_container.b_input_loading.value:
             t1 = time.perf_counter()
             try:
-                self.current_track_result = track_queue.get(block=False)
-                frame += 1
+                track_result = track_queue.get(block=False)
+                frame = track_result[0]
+                self.current_track_result = track_result[1]
+
+                self.save_result_to_file(self.main_output_dir, self.all_predict_result)
+                # del self.all_predict_result
+                self.all_predict_result = {}
+
+                # frame += 1
                 subframe = 0
                 self.current_predict_result = self.predictor.set_new_base(self.current_track_result)
                 self.all_predict_result[frame] = {}
@@ -51,7 +58,8 @@ class PathPredictProcess(BaseProcess):
                 if isinstance(self.current_predict_result, torch.Tensor):
                     self.current_predict_result = self.current_predict_result.numpy()
 
-            predict_queue.put(self.current_predict_result)
+            if not predict_queue.qsize() > 8:
+                predict_queue.put((frame, subframe, self.current_predict_result))
 
             if isinstance(self.current_predict_result, np.ndarray):
                 result_each_subframe = {}
@@ -59,6 +67,7 @@ class PathPredictProcess(BaseProcess):
                 result_id = {}
                 valid_position = np.nonzero(self.current_predict_result)
                 target_num = len(valid_position[0]) // 4
+                # print(target_num)
                 for i in range(target_num):
                     cls = valid_position[0][i * 4]
                     target_id = valid_position[1][i * 4]
@@ -67,18 +76,21 @@ class PathPredictProcess(BaseProcess):
                     x = self.current_predict_result[cls][target_id][x_position]
                     y = self.current_predict_result[cls][target_id][y_position]
                     result_id[target_id] = ((x, y, 0, 0), 1.0)
-                    result_class[cls].update(result_id)
+                    result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
+                    # print(i,':',cls,':',result_id)
 
                 t2 = time.perf_counter()
                 fps = 1 / (t2 - t1)
                 result_each_subframe[subframe] = (result_class, fps)
                 self.all_predict_result[frame].update(result_each_subframe)
 
+        self.save_result_to_file(self.main_output_dir, self.all_predict_result)
+        del self.all_predict_result
+
         while predict_queue.qsize() > 0:
-            predict_queue.get(block=False)
+            predict_queue.get()
 
     def run_end(self) -> None:
-        self.all_frame_results = self.all_predict_result
         super().run_end()
 
         self.logger.info('-'*5 + 'Predict Finished' + '-'*5)

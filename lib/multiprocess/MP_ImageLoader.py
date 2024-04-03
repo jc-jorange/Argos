@@ -65,6 +65,7 @@ class ImageLoaderProcess(BaseProcess):
                         pass
                     img_send = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
                     input_queue.put((self.data_loader.count, img_send, img_0.shape))
+                    del img_send
 
                 self.shared_container.set_data(img)
                 self.shared_container.input_frame_id.value = self.data_loader.count
@@ -75,6 +76,8 @@ class ImageLoaderProcess(BaseProcess):
                         os.path.join(self.frame_dir, '{:05d}.jpg'.format(self.data_loader.count)),
                         img_0
                     )
+
+                del img
 
         except:
             traceback.print_exc()

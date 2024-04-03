@@ -2,6 +2,7 @@ from lib.utils.yacs import CfgNode as CN
 from .networks.part_config_master import part_cfg_master as part_cfg
 from .networks.part_config_master import E_part_info
 from enum import Enum, unique
+import os
 
 
 @unique
@@ -85,3 +86,9 @@ def merge_config(cfg, args_cfg):
     cfg.merge_from_file(args_cfg)
     cfg.freeze()
 
+
+def check_cfg(cfg_path, cfg_name):
+    for file in os.listdir(cfg_path):
+        if os.path.splitext(file)[0] == cfg_name:
+            return os.path.join(cfg_path, file)
+    raise AttributeError("No config file found in config path {}".format(cfg_path))

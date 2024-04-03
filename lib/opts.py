@@ -6,6 +6,7 @@ import argparse
 import os
 import time
 import torch
+from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture, check_cfg
 
 
 class opts(object):
@@ -232,6 +233,10 @@ class opts(object):
             opt.load_model = os.path.join(model_path, 'model_last.pth')
 
         opt.device = self.select_device(opt)
+
+        cfg_path = check_cfg(opt.arch_cfg_path, opt.arch)
+        opt.model_config = model_cfg_master
+        merge_config(opt.model_config, cfg_path)
 
         return opt
 

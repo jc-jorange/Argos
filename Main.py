@@ -16,6 +16,7 @@ from lib.tracker.utils.utils import mkdir_if_missing
 from lib.multiprocess import process_factory, EMultiprocess
 from lib.multiprocess.MP_IndiPost import IndividualPostProcess
 from lib.multiprocess.MP_GlobalIdMatch import GlobalIdMatchProcess
+from lib.multiprocess.MP_GlobalPost import GlobalPostProcess
 from lib.matchor.MultiCameraMatch.CenterRayIntersect import CenterRayIntersectMatchor
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -186,14 +187,15 @@ def track(opt_data):
     main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
     global_match_shared_container = SharedContainer(opt_data)
     global_id_matchor = GlobalIdMatchProcess(
-        container_multiprocess_queue, CenterRayIntersectMatchor, global_match_shared_container, 0, opt_data
+        container_multiprocess_queue, CenterRayIntersectMatchor, global_match_shared_container, -1, opt_data
     )
     global_id_matchor.start()
 
-    for i, process_dict in container_multiprocess.items():
-        for process_class, p in process_dict.items():
-            main_logger.info('-' * 5 + f'Start {process_class.name} Sub-Process No.{i}' + '-' * 5)
-            p.process_run_action()
+    for process_type, process_class in process_factory.items():
+        for model_index in range(sub_processor_num):
+            process_ = container_multiprocess[model_index][process_type]
+            main_logger.info('-' * 5 + f'Start {process_class.name} Sub-Process No.{model_index}' + '-' * 5)
+            process_.process_run_action()
 
     main_logger.info('-' * 5 + f'Start Global Id Matching Sub-Processor')
     global_id_matchor.process_run_action()
@@ -216,11 +218,24 @@ def track(opt_data):
         indi_post.start()
         indi_post.process_run_action()
 
+    for i_process, match_result_dir in global_id_matchor.match_result_dir_dict.items():
+        container_multiprocess_dir[i_process].update({EMultiprocess.GlobalMatching: match_result_dir})
+    main_logger.info('-' * 5 + f'Setting Global PostProcess Sub-Processor')
+    global_post = GlobalPostProcess(
+        container_multiprocess_dir,
+        global_match_shared_container, -1, opt_data
+    )
+    global_post.start()
+    global_post.process_run_action()
+
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
         for i, p in container_multiprocess.items():
             b_check_tracker = b_check_tracker or p[EMultiprocess.IndiPost].is_alive()
+
+    while global_post.is_alive():
+        pass
 
     main_logger.info('-' * 10 + 'Main Finished' + '-' * 10)
 

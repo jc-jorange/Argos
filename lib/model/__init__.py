@@ -7,13 +7,11 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 import os
-import datetime
 import yaml
 from collections import OrderedDict
-import multiprocessing
 
 from lib.utils.logger import ALL_LoggerContainer
-from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture
+from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture, check_cfg
 from lib.model.model_config import E_arch_position, E_model_general_info, E_model_part_input_info, E_model_part_input_info
 from lib.model.model_config import model_general_info_default_dict
 from .networks.part_config_master import E_part_info
@@ -122,18 +120,19 @@ class BaseModel(nn.Module):
         self.input_info = {}
 
         self.opt = opt
-        cfg_path = check_cfg(opt.arch_cfg_path, opt.arch)
-        self.cfg = model_cfg_master
-        merge_config(self.cfg, cfg_path)
+        # cfg_path = check_cfg(opt.arch_cfg_path, opt.arch)
+        # self.cfg = model_cfg_master
+        # merge_config(self.cfg, cfg_path)
+        self.cfg = self.opt.model_config
 
         self.logger.info('model config: {}'.format(opt.arch))
 
-        self.classes_max_num = self.cfg[E_model_general_info(1).name] \
-            if self.cfg[E_model_general_info(1).name] > model_general_info_default_dict[E_model_general_info(1)] \
-            else model_general_info_default_dict[E_model_general_info(1)]
-        self.objects_max_num = self.cfg[E_model_general_info(2).name] \
-            if self.cfg[E_model_general_info(2).name] > model_general_info_default_dict[E_model_general_info(2)] \
-            else model_general_info_default_dict[E_model_general_info(2)]
+        self.classes_max_num = self.cfg[E_model_general_info.max_classes_num.name] \
+            if self.cfg[E_model_general_info.max_classes_num.name] > model_general_info_default_dict[E_model_general_info.max_classes_num] \
+            else model_general_info_default_dict[E_model_general_info.max_classes_num]
+        self.objects_max_num = self.cfg[E_model_general_info.max_objects_num.name] \
+            if self.cfg[E_model_general_info.max_objects_num.name] > model_general_info_default_dict[E_model_general_info.max_objects_num] \
+            else model_general_info_default_dict[E_model_general_info.max_objects_num]
 
         arch_list = check_model_architecture(self.cfg)
         modules_dict = OrderedDict()
@@ -205,13 +204,6 @@ class BaseModel(nn.Module):
 
         del net, x
         torch.cuda.empty_cache()
-
-
-def check_cfg(cfg_path, cfg_name):
-    for file in os.listdir(cfg_path):
-        if os.path.splitext(file)[0] == cfg_name:
-            return os.path.join(cfg_path, file)
-    raise AttributeError("No config file found in config path {}".format(cfg_path))
 
 
 class S_info_data:

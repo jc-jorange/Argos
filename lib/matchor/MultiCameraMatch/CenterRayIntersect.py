@@ -27,15 +27,16 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
         classandid_predict_result = np.nonzero(predict_result)
         classandid_baseline = np.nonzero(self.baseline_result)
 
-        camera_position_baseline = self.baseline_camera_position
-        camera_position_predict = self.camera_position_dict[idx]
+        camera_position_baseline = np.squeeze(self.baseline_camera_position.T)[0:3]
+        camera_position_predict = np.squeeze(self.camera_position_dict[idx].T)[0:3]
 
         matched_baseline_classandid = {}
         for i_predict in range(len(classandid_predict_result[0]) // 4):
             class_predict = classandid_predict_result[0][i_predict * 4]
             id_predict = classandid_predict_result[1][i_predict * 4]
-            coord_predict = predict_result_in_camera_coord[class_predict, id_predict]
+            coord_predict = predict_result_in_camera_coord[class_predict, id_predict][0:3]
 
+            min_distance_tuple = (-1, -1, 1000000)
             for i_base in range(len(classandid_baseline[0]) // 4):
                 class_base = classandid_baseline[0][i_base * 4]
                 id_base = classandid_baseline[1][i_base * 4]
@@ -44,7 +45,7 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
                     if id_base == matched_baseline_classandid[class_base]:
                         continue
 
-                coord_base = self.baseline_result_in_camera[class_base, id_base]
+                coord_base = self.baseline_result_in_camera[class_base, id_base][0:3]
 
                 t1, t2 = self.get_intersect_t(
                     camera_position_baseline, coord_base, camera_position_predict, coord_predict
@@ -53,18 +54,22 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
                 p2 = self.get_ray_position(camera_position_predict, coord_predict, t2)
 
                 distance = np.linalg.norm(p2 - p1)
-                if distance < self.max_distance:
-                    if class_predict != class_base or id_predict != id_base:
-                        predict_result[class_base, id_base] = predict_result[class_predict, id_predict]
-                        predict_result[class_predict, id_predict, :] = 0
+                print(f'idx: {idx} ', f'class: {class_predict} ', f'id: {id_predict} ',
+                      f'base class: {class_base}', f'base id: {id_base}', f'distance: {distance}',
+                      f'p1: {p1}', f'p2: {p2}', f't1: {t1}', f't2: {t2}')
+                if distance < self.max_distance and 0 < t1 < self.max_range and 0 < t2 < self.max_range:
+                    if distance < min_distance_tuple[2]:
+                        min_distance_tuple = (class_base, id_base, distance)
 
-                    matched_baseline_classandid.update({class_base: id_base})
-                else:
-                    if class_predict != class_base or id_predict != id_base:
-                        self.baseline_result[class_predict, id_predict] = predict_result[class_predict, id_predict]
-                        self.baseline_result_in_camera[class_predict, id_predict] = \
-                            predict_result_in_camera_coord[class_predict, id_predict]
-                    else:
+            if min_distance_tuple[0] > -1:
+                if class_predict != min_distance_tuple[0] or id_predict != min_distance_tuple[1]:
+                    predict_result[min_distance_tuple[0], min_distance_tuple[1]] = predict_result[class_predict, id_predict]
+                    predict_result[class_predict, id_predict, :] = 0
+
+                matched_baseline_classandid.update({min_distance_tuple[0]: min_distance_tuple[1]})
+            else:
+                if class_predict in classandid_baseline[0]:
+                    if id_predict == classandid_baseline[1][list(classandid_baseline[0]).index(class_predict)]:
                         id_loop = id_predict
                         d_i = 1
                         while (id_loop + d_i) in classandid_predict_result[1]:
@@ -82,5 +87,13 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
 
                         self.baseline_result_in_camera[class_base, new_id] = \
                             predict_result_in_camera_coord[class_predict, id_predict]
+                    else:
+                        self.baseline_result[class_predict, id_predict] = predict_result[class_predict, id_predict]
+                        self.baseline_result_in_camera[class_predict, id_predict] = \
+                            predict_result_in_camera_coord[class_predict, id_predict]
+                else:
+                    self.baseline_result[class_predict, id_predict] = predict_result[class_predict, id_predict]
+                    self.baseline_result_in_camera[class_predict, id_predict] = \
+                        predict_result_in_camera_coord[class_predict, id_predict]
 
         return predict_result

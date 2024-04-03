@@ -4,12 +4,20 @@ from enum import Enum, unique
 import numpy as np
 import torch
 
+from lib.model.model_config import E_model_general_info, model_general_info_default_dict
+
 
 @unique
 class EQueueType(Enum):
     LoadResultSend = 1
     TrackerResultSend = 2
     PredictResultSend = 3
+
+@unique
+class EResultType(Enum):
+    TrackResult = 1
+    PredictResult = 2
+    MatchResult = 3
 
 
 def store_in_shm(name: str, data) -> shared_memory.SharedMemory:
@@ -39,10 +47,20 @@ class SharedContainer:
         self.reset(self.opt.net_input_shape, self.opt.device)
 
         self.b_input_loading = mp.Value('B', True)
+
         self.input_frame_id = mp.Value('I', 0)
+
         self.origin_shape = (mp.Value('I', 0), mp.Value('I', 0), mp.Value('I', 0))
 
+        self.max_class = self.opt.model_config[E_model_general_info.max_classes_num.name] \
+            if self.opt.model_config[E_model_general_info.max_classes_num.name] > model_general_info_default_dict[E_model_general_info.max_classes_num] \
+            else model_general_info_default_dict[E_model_general_info.max_classes_num]
+        self.max_object = self.opt.model_config[E_model_general_info.max_objects_num.name] \
+            if self.opt.model_config[E_model_general_info.max_objects_num.name] > model_general_info_default_dict[E_model_general_info.max_objects_num] \
+            else model_general_info_default_dict[E_model_general_info.max_objects_num]
+
         self.queue_dict = {QueueType: mp.Queue() for name, QueueType in EQueueType.__members__.items()}
+        self.result_dict = {ResultType: mp.Array('f', self.max_class * self.max_object * 4, lock=False) for name, ResultType in EResultType.__members__.items()}
 
     def set_origin_shape(self, shape: tuple) -> None:
         self.origin_shape[0].value = shape[0]

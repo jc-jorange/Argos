@@ -1,10 +1,11 @@
+import ctypes
 import time
 
 import numpy
 from enum import Enum, unique
 import torch
 
-from .SharedMemory import SharedContainer, EQueueType
+from .SharedMemory import SharedContainer, EQueueType, EResultType
 from ..multiprocess import BaseProcess
 from lib.tracker.multitracker import MCJDETracker
 from ..postprocess.utils import write_result as wr
@@ -110,10 +111,14 @@ class TrackerProcess(BaseProcess):
                         self.current_track_result[cls_id, t_id] = xywh
             self.all_frame_results[input_frame_id] = {0: (result_per_subframe, self.fps_loop_avg)}
 
-            track_to_predict_queue.put(self.current_track_result)
+            # result_numpy = numpy.frombuffer(self.shared_container.result_dict[EResultType.TrackResult], dtype=ctypes.c_float)
+
+            track_to_predict_queue.put((self.frame_id, self.current_track_result))
 
             # loop timer end record
             self.timer_loop.toc()
+
+            del img
 
             self.fps_loop_avg = self.frame_id / max(1e-5, self.timer_loop.total_time)
             self.fps_loop_current = 1.0 / max(1e-5, self.timer_loop.diff)
@@ -122,6 +127,9 @@ class TrackerProcess(BaseProcess):
             self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
 
             if self.frame_id % 10 == 0 and self.frame_id != 0:
+                self.save_result_to_file(self.main_output_dir, self.all_frame_results)
+                self.all_frame_results = wr.S_default_result
+
                 self.logger.info(
                     f'Processing frame {self.frame_id}: '
                     f'loop average fps: {self.fps_loop_avg:.2f}, '
@@ -145,18 +153,17 @@ class TrackerProcess(BaseProcess):
                 )
             )
 
-        try:
-            track_to_predict_queue.get()
-        except Exception as e:
-            print(e)
+        self.save_result_to_file(self.main_output_dir, self.all_frame_results)
+        del self.all_frame_results
 
+        while track_to_predict_queue.qsize() > 0:
+            track_to_predict_queue.get()
 
     def run_end(self) -> None:
+        super().run_end()
         self.logger.info(f'Final loop time {self.timer_loop.total_time}')
         self.logger.info(f'Final loop FPS {self.fps_loop_avg}')
         self.logger.info(f'Final inference time {self.timer_track.total_time}')
         self.logger.info(f'Final inference FPS {self.fps_neuralnetwork_avg}')
-
-        super().run_end()
 
         self.logger.info('-'*5 + 'Tracker Finished' + '-'*5)

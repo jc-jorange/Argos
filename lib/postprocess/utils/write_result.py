@@ -63,7 +63,7 @@ def plot_tracks(
     line_thickness = max(2, int(image.shape[1] / 500.))
 
     subframe_total = list(result_frame.keys())[-1] if len(list(result_frame.keys())) > 0 else 0
-    fps = result_frame[0][1] if subframe_total >= 0 else 0.0
+    fps = result_frame[list(result_frame.keys())[0]][1] if subframe_total >= 0 else 0.0
 
     cv2.putText(
         img,
@@ -81,6 +81,7 @@ def plot_tracks(
         fps = result_subframe[1]
         for i_class, result_by_id in result_class.items():
             for i_id, result in result_by_id.items():
+                last_result = (0,0)
                 tlwh, score = result
 
                 x1, y1, w, h = tlwh
@@ -100,7 +101,12 @@ def plot_tracks(
                                   )
                 else:
                     if result_last_subframe:
-                        last_result = result_last_subframe[i_class][i_id][0]
+                        try:
+                            last_result = result_last_subframe[i_class][i_id][0]
+                        except KeyError:
+                            continue
+                        except IndexError:
+                            print(result_last_subframe)
                         last_point = (int(last_result[0]), int(last_result[1]))
                         cv2.arrowedLine(
                             img=img,
@@ -150,7 +156,10 @@ def plot_tracks(
     return img
 
 
-def write_results_to_text(output_dir: str, results_dict: dict, data_type: E_text_result_type):
+def write_results_to_text(
+        output_dir: str,
+        results_dict: dict,
+        data_type: E_text_result_type):
     """
     :param output_dir:
     :param results_dict:
@@ -165,7 +174,7 @@ def write_results_to_text(output_dir: str, results_dict: dict, data_type: E_text
     file_dir = os.path.join(output_dir, Dict_text_result_name[data_type])
 
     last_line = None
-    with open(file_dir, 'w') as f:
+    with open(file_dir, 'a') as f:
         for frame, result_subframe in results_dict.items():
             if frame > 0:
                 for subframe, result_and_fps in result_subframe.items():

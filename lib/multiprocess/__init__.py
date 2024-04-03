@@ -3,6 +3,8 @@ import os
 from multiprocessing import Process, Value
 from enum import Enum, unique
 
+import numpy as np
+
 from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
 from lib.tracker.utils.utils import mkdir_if_missing
@@ -52,7 +54,7 @@ class BaseProcess(Process):
         ...
 
     def run_end(self) -> None:
-        self.final_save()
+        ...
 
     def run(self) -> None:
         super(BaseProcess, self).run()
@@ -92,12 +94,12 @@ class BaseProcess(Process):
     def set_logger_file_handler(self, log_name: str, log_dir: str) -> None:
         ALL_LoggerContainer.add_file_handler(self.name, log_name, log_dir)
 
-    def final_save(self):
+    def save_result_to_file(self, output_dir: str, result: dict):
         for each_type in self.save_type:
-            self.logger.info(f'Saving {each_type.name} result in {self.main_output_dir}')
+            # self.logger.info(f'Saving {each_type.name} result in {self.main_output_dir}')
             wr.write_results_to_text(
-                self.main_output_dir,
-                self.all_frame_results,
+                output_dir,
+                result,
                 each_type
             )
 

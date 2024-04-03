@@ -1,3 +1,4 @@
+import numpy
 import numpy as np
 import time
 from enum import Enum, unique
@@ -22,7 +23,7 @@ class BasePredictor:
     def filter_close_track(self, point: S_point, t: float) -> {S_point}:
         predict_result = self.get_predicted_position(t)
         if isinstance(predict_result, np.ndarray):
-            predict_result = predict_result.numpy()
+            predict_result = predict_result
         else:
             predict_result = np.zeros(point.shape)
 
@@ -69,37 +70,35 @@ class BasePredictor:
         return dict_reid
 
     def set_new_base(self, point: S_point) -> S_point:
-        # try:
-        #     if self.track_counter.any():
-        #         self.track_counter -= 1
-        # except AttributeError:
-        #     self.track_counter = np.where(point> 0, self.max_step + 1, 1)
-
         t_current = time.perf_counter()
-        # self.dt_base = t_current - self.time_0
 
-        predict_result = self.get_predicted_position(t_current).numpy()
+        predict_result = self.get_predicted_position(t_current)
 
-        reid_track_dict = self.filter_close_track(point, t_current)
+        if isinstance(predict_result, np.ndarray):
+            reid_track_dict = self.filter_close_track(point, t_current)
 
-        for origin_track_id, new_track_id in reid_track_dict.items():
-            point[new_track_id] = point[origin_track_id]
-            point[origin_track_id] = 0
-        # self.track_counter[np.nonzero(point)] = self.max_step
+            for origin_track_id, new_track_id in reid_track_dict.items():
+                point[new_track_id] = point[origin_track_id]
+                point[origin_track_id] = 0
+            # self.track_counter[np.nonzero(point)] = self.max_step
 
-        both = point * predict_result
-        both = np.where(both > 0, 1, 0)
-        # m_track = np.where(both, 0, point)
-        m_predict = np.where(both, 0, predict_result)
-        point = point + m_predict
+            # print(numpy.nonzero(predict_result))
+            both = point * predict_result
+            both = np.where(both > 0, 1, 0)
+            # m_track = np.where(both, 0, point)
+            m_predict = np.where(both, 0, predict_result)
+            point = point + m_predict
 
-        self.time_0 = t_current
-        self.p0_list.pop(0)
-        self.time_list.pop(0)
-        self.p0_list.append(point)
-        self.time_list.append(t_current)
+            self.time_0 = t_current
+            self.p0_list.pop(0)
+            self.time_list.pop(0)
+            self.p0_list.append(point)
+            self.time_list.append(t_current)
 
-        return predict_result
+            return predict_result
+        else:
+            self.p0_list.append(point)
+            self.time_list.append(t_current)
 
     def clear(self) -> None:
         self.time_0 = 0.0
@@ -113,7 +112,7 @@ class BasePredictor:
     def predict_content(self, t: float) -> S_point:
         pass
 
-    def get_predicted_position(self, t: float) -> S_point:
+    def get_predicted_position(self, t: float) -> S_point or None:
         if self.can_process_predict():
             return self.predict_content(t=t)
         else:
