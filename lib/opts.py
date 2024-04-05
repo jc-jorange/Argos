@@ -57,10 +57,6 @@ class opts(object):
                                  default='./lib/dataset/cfg/custom.json',
                                  help='load data from cfg')
 
-        self.parser.add_argument('--show_image',
-                                 action='store_true',
-                                 help='whether show result image during tracking')
-
         # system
         self.parser.add_argument('--gpus',
                                  nargs='+',

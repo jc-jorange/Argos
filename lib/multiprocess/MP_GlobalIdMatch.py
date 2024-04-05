@@ -5,30 +5,9 @@ from collections import defaultdict
 import numpy
 
 from ..multiprocess import BaseProcess
-from .SharedMemory import EQueueType
 from lib.matchor import BaseMatchor
+from lib.postprocess.utils.write_result import convert_numpy_to_dict
 from ..postprocess.utils import write_result as wr
-
-# Test_Camera = {
-#             2: numpy.array([
-#                 [-0.027821],
-#                 [-0.70655],
-#                 [-0.250505],
-#                 [1],
-#             ]).T,
-#             0: numpy.array([
-#                 [0],
-#                 [-0.69785],
-#                 [-0.268505],
-#                 [1],
-#             ]).T,
-#             1: numpy.array([
-#                 [0.027821],
-#                 [-0.70655],
-#                 [-0.250505],
-#                 [1]
-#             ]).T,
-# }
 
 Test_Camera = {
             2: numpy.array([
@@ -97,24 +76,7 @@ class GlobalIdMatchProcess(BaseProcess):
         t2 = time.perf_counter()
         fps = 1 / (t2 - t1)
 
-        result_frame = {}
-        result_each_subframe = {}
-        result_class = defaultdict(dict)
-        result_id = {}
-        valid_position = numpy.nonzero(result)
-        target_num = len(valid_position[0]) // 4
-        for i in range(target_num):
-            cls = valid_position[0][i * 4]
-            target_id = valid_position[1][i * 4]
-            x_position = valid_position[2][(i * 4)]
-            y_position = valid_position[2][(i * 4) + 1]
-            x = result[cls][target_id][x_position]
-            y = result[cls][target_id][y_position]
-            result_id[target_id] = ((x, y, 0, 0), 1.0)
-            result_class[cls].update(result_id)
-
-        result_each_subframe[subframe] = (result_class, fps)
-        result_frame[frame] = result_each_subframe
+        result_frame = convert_numpy_to_dict(result, frame, subframe, fps)
 
         save_dir = self.match_result_dir_dict[camera_i]
 
@@ -138,24 +100,7 @@ class GlobalIdMatchProcess(BaseProcess):
                         break
                     self.matchor.baseline_camera_position = Test_Camera[0]
 
-                    result_frame = {}
-                    result_each_subframe = {}
-                    result_class = defaultdict(dict)
-                    result_id = {}
-                    valid_position = numpy.nonzero(result)
-                    target_num = len(valid_position[0]) // 4
-                    for i in range(target_num):
-                        cls = valid_position[0][i * 4]
-                        target_id = valid_position[1][i * 4]
-                        x_position = valid_position[2][(i * 4)]
-                        y_position = valid_position[2][(i * 4) + 1]
-                        x = result[cls][target_id][x_position]
-                        y = result[cls][target_id][y_position]
-                        # result_id[target_id] = ((x, y, 0, 0), 1.0)
-                        result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
-
-                    result_each_subframe[subframe] = (result_class, 0.0)
-                    result_frame[frame] = result_each_subframe
+                    result_frame = convert_numpy_to_dict(result, frame, subframe, 0.0)
 
                     save_dir = self.match_result_dir_dict[0]
 

@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from enum import Enum, unique
+from collections import defaultdict
 
 # {frame: {subframe: ({class: {ID: ((tlwh), score)}}, fps)}}
 S_default_result = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
@@ -26,6 +27,29 @@ Dict_text_result_format = {
 }
 
 Str_video_result_name = 'video_result.mp4'
+
+
+def convert_numpy_to_dict(result: np.ndarray, frame: int, subframe: int, fps: float) -> dict:
+    result_frame = {}
+    result_each_subframe = {}
+    result_class = defaultdict(dict)
+
+    valid_position = np.nonzero(result)
+
+    target_num = len(valid_position[0]) // 4
+    for i in range(target_num):
+        cls = valid_position[0][i * 4]
+        target_id = valid_position[1][i * 4]
+        x_position = valid_position[2][(i * 4)]
+        y_position = valid_position[2][(i * 4) + 1]
+        x = result[cls][target_id][x_position]
+        y = result[cls][target_id][y_position]
+        result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
+
+    result_each_subframe[subframe] = (result_class, fps)
+    result_frame[frame] = result_each_subframe
+
+    return result_frame
 
 
 def get_color(i_class: int, idx: int) -> tuple:

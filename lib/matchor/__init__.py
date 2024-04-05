@@ -1,5 +1,5 @@
 import numpy as np
-import time
+from enum import Enum, unique
 
 S_Match_point = np.ndarray  # shape:[class, id, (xy)]
 
@@ -36,3 +36,17 @@ class BaseMatchor:
             self.baseline_result_in_camera = self.get_baseline_result()
 
         return self.match_content(camera_id, predict_result)
+
+
+from .MultiCameraMatch.CenterRayIntersect import CenterRayIntersectMatchor
+
+
+@unique
+class EMatchorFactory(Enum):
+    CenterRayIntersect = 1
+
+
+matchor_factory = {
+    EMatchorFactory.CenterRayIntersect.name: CenterRayIntersectMatchor,
+}
+
