@@ -102,15 +102,12 @@ def plot_tracks(
     result_last_subframe = {}
     for each_subframe, result_subframe in result_frame.items():
         result_class = result_subframe[0]
-        fps = result_subframe[1]
         for i_class, result_by_id in result_class.items():
             for i_id, result in result_by_id.items():
-                last_result = (0,0)
                 tlwh, score = result
-
                 x1, y1, w, h = tlwh
                 int_box = tuple(map(int, (x1, y1, x1 + w, y1 + h)))  # x1, y1, x2, y2
-                id_text = '{}'.format(i_id)
+                id_text = f'{i_id}'
 
                 color = get_color(i_class, i_id)
 
@@ -124,13 +121,9 @@ def plot_tracks(
                         thickness=line_thickness
                                   )
                 else:
-                    if result_last_subframe:
-                        try:
-                            last_result = result_last_subframe[i_class][i_id][0]
-                        except KeyError:
-                            continue
-                        except IndexError:
-                            print(result_last_subframe)
+                    # draw arrow
+                    try:
+                        last_result = result_last_subframe[i_class][i_id][0]
                         last_point = (int(last_result[0]), int(last_result[1]))
                         cv2.arrowedLine(
                             img=img,
@@ -139,7 +132,7 @@ def plot_tracks(
                             color=color,
                             thickness=line_thickness,
                         )
-                    else:
+                    except KeyError or IndexError:
                         cv2.circle(
                             img=img,
                             center=int_box[0:2],
@@ -148,7 +141,7 @@ def plot_tracks(
                             thickness=-1,
                         )
 
-                if each_subframe == 0:
+                if each_subframe == list(result_frame.keys())[0]:
                     # draw class name and index
                     cv2.putText(
                         img,

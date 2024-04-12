@@ -5,10 +5,10 @@ import numpy
 from enum import Enum, unique
 import torch
 
-from .SharedMemory import SharedContainer, EQueueType, EResultType
-from ..multiprocess import BaseProcess
+from lib.multiprocess.SharedMemory import ProducerBucket, EQueueType, EResultType
+from lib.multiprocess import BaseProcess
 from lib.tracker.multitracker import MCJDETracker
-from ..postprocess.utils import write_result as wr
+from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.timer import Timer
 
 

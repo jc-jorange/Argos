@@ -4,10 +4,10 @@ from typing import Type
 from collections import defaultdict
 import numpy
 
-from ..multiprocess import BaseProcess
+from lib.multiprocess import BaseProcess
 from lib.matchor import BaseMatchor
 from lib.postprocess.utils.write_result import convert_numpy_to_dict
-from ..postprocess.utils import write_result as wr
+from lib.postprocess.utils import write_result as wr
 
 Test_Camera = {
             2: numpy.array([
@@ -70,49 +70,41 @@ class GlobalIdMatchProcess(BaseProcess):
 
         self.matchor = matchor(intrinsic_parameters_dict)
 
-    def match_other_predict(self, frame, subframe, camera_i, predict_result):
-        t1 = time.perf_counter()
-        result = self.matchor.get_match_result(camera_i, predict_result)
-        t2 = time.perf_counter()
-        fps = 1 / (t2 - t1)
-
-        result_frame = convert_numpy_to_dict(result, frame, subframe, fps)
-
-        save_dir = self.match_result_dir_dict[camera_i]
-
-        self.save_result_to_file(save_dir, result_frame)
-
     def run_action(self) -> None:
         super().run_action()
-        self.logger.info('Start global matching')
-        # predict_queue = self.shared_container.queue_dict[EQueueType.PredictResultSend]
+        self.logger.info('Start global_process matching')
         self.matchor.camera_position_dict = Test_Camera
+        result = numpy.empty((2, 2, 2))
         while self.shared_container.b_input_loading.value:
+            t1 = time.perf_counter()
+            match_times = 0
             for i_camera, each_queue in self.queue_dict.items():
+                match_times += 1
                 if i_camera == 0:
                     try:
                         predict_result = each_queue.get(block=False)
                         frame = predict_result[0]
-                        subframe = predict_result[1]
+                        subframe = 0
                         result = predict_result[2]
                         self.matchor.baseline_result = predict_result[2]
                     except multiprocessing.queues.Empty:
                         break
                     self.matchor.baseline_camera_position = Test_Camera[0]
-
-                    result_frame = convert_numpy_to_dict(result, frame, subframe, 0.0)
-
-                    save_dir = self.match_result_dir_dict[0]
-
-                    self.save_result_to_file(save_dir, result_frame)
-
                 else:
                     try:
                         each_result = each_queue.get(block=False)
                         frame = each_result[0]
                         subframe = each_result[1]
                         each_result = each_result[2]
-                        if isinstance(each_result, numpy.ndarray) and isinstance(self.matchor.baseline_result, numpy.ndarray):
-                            self.match_other_predict(frame, subframe, i_camera, each_result)
+                        if isinstance(each_result, numpy.ndarray):
+                            result = self.matchor.get_match_result(i_camera, each_result)
                     except multiprocessing.queues.Empty:
                         continue
+
+                t2 = time.perf_counter()
+                fps = match_times / (t2 - t1)
+                result_frame = convert_numpy_to_dict(result, frame, subframe, fps)
+
+                save_dir = self.match_result_dir_dict[i_camera]
+
+                self.save_result_to_file(save_dir, result_frame)

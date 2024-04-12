@@ -4,10 +4,10 @@ from typing import Type
 from collections import defaultdict
 from multiprocessing import queues
 
-from ..multiprocess import BaseProcess
-from .SharedMemory import EQueueType
+from lib.multiprocess import BaseProcess
+from lib.multiprocess.SharedMemory import EQueueType
 from lib.predictor import BasePredictor, predictor_factory
-from ..postprocess.utils import write_result as wr
+from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.utils import *
 
 

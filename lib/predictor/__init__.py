@@ -122,6 +122,7 @@ class BasePredictor:
 from .spline.linear_spline import LinearSpline
 from .spline.hermite_spline import HermiteSpline
 
+
 @unique
 class EPredictorName(Enum):
     LinearSpline = 1

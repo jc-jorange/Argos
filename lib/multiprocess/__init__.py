@@ -3,13 +3,11 @@ import os
 from multiprocessing import Process, Value
 from enum import Enum, unique
 
-import numpy as np
-
 from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
 from lib.tracker.utils.utils import mkdir_if_missing
 import lib.postprocess.utils.write_result as wr
-from lib.multiprocess.SharedMemory import SharedContainer
+from lib.multiprocess.SharedMemory import ProducerBucket, ConsumerOutputPort
 
 
 class BaseProcess(Process):
@@ -19,7 +17,7 @@ class BaseProcess(Process):
     save_type = []
 
     def __init__(self,
-                 shared_container: SharedContainer,
+                 shared_container: ProducerBucket,
                  idx: int,
                  opt: opts,
                  ) -> None:
@@ -103,6 +101,32 @@ class BaseProcess(Process):
                 each_type
             )
 
+
+class ProducerProcess(BaseProcess):
+    def __init__(
+            self,
+            producer_bucket: ProducerBucket,
+            *args,
+            **kwargs,
+    ) -> None:
+        super(ProducerProcess, self).__init__(*args, **kwargs,)
+        self.Bucket = producer_bucket
+
+
+class ConsumerProcess(BaseProcess):
+    def __init__(
+            self,
+            producer_bucket: ProducerBucket,
+            output_type: str,
+            data_shape: tuple,
+            *args,
+            **kwargs,
+    ) -> None:
+        super(ConsumerProcess, self).__init__(*args, **kwargs,)
+        self.ProducerBucket = producer_bucket
+        self.OutputPort = ConsumerOutputPort(self.opt, output_type, data_shape)
+
+
 @unique
 class EMultiprocess(Enum):
     ImageLoader = 1
@@ -110,13 +134,33 @@ class EMultiprocess(Enum):
     Predictor = 3
     IndiPost = 4
     GlobalMatching = 5
+    GlobalPost = 6
 
 
-from .MP_ImageLoader import ImageLoaderProcess
-from .MP_Tracker import TrackerProcess
-from .MP_PathPredict import PathPredictProcess
-from .MP_IndiPost import IndividualPostProcess
+from .individual_process.MP_ImageLoader import ImageLoaderProcess
+from .individual_process.MP_Tracker import TrackerProcess
+from .individual_process.MP_PathPredict import PathPredictProcess
+from .individual_process.MP_IndiPost import IndividualPostProcess
 
+
+essential_process_indi_pre = [ImageLoaderProcess, TrackerProcess]
+
+process_factory_indi_option = {
+    EMultiprocess.Predictor.name: PathPredictProcess,
+}
+
+essential_process_indi_post = [IndividualPostProcess, ]
+
+from .global_process.MP_GlobalIdMatch import GlobalIdMatchProcess
+from .global_process.MP_GlobalPost import GlobalPostProcess
+
+essential_process_global_pre = []
+
+process_factory_global_option = {
+    EMultiprocess.GlobalMatching.name: GlobalIdMatchProcess
+}
+
+essential_process_global_post = [GlobalPostProcess]
 
 process_factory = {
     EMultiprocess.ImageLoader: ImageLoaderProcess,

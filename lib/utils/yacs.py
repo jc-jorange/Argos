@@ -424,7 +424,7 @@ class CfgNode(dict):
 
 load_cfg = (
     CfgNode.load_cfg
-)  # keep this function in global scope for backward compatibility
+)  # keep this function in global_process scope for backward compatibility
 
 
 def _valid_type(value, allow_cfg_node=False):

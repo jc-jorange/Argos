@@ -6,8 +6,8 @@ import os
 import numpy as np
 import torch
 
-from ..multiprocess import BaseProcess
-from .SharedMemory import EQueueType
+from lib.multiprocess import BaseProcess
+from lib.multiprocess.SharedMemory import EQueueType
 from lib.input_data_loader import EInputDataType, loader_factory, BaseInputDataLoader
 
 

@@ -1,6 +1,6 @@
 import os
 
-from ..multiprocess import BaseProcess, EMultiprocess
+from lib.multiprocess import BaseProcess, EMultiprocess
 from lib.postprocess import BasePost
 from lib.postprocess.result_writer import ImageResultWriter, VideoResultWriter
 import lib.postprocess.utils.write_result as wr
@@ -25,7 +25,7 @@ class GlobalPostProcess(BaseProcess):
             match_dir = each_dir_dict[EMultiprocess.GlobalMatching]
             match_result = os.path.join(match_dir, wr.Dict_text_result_name[wr.E_text_result_type.raw])
             match_image_save_dir = self.making_dir(match_dir, self.opt.frame_dir)
-            match_image_writer = ImageResultWriter(frame_dir, match_image_save_dir, match_result, self.opt)
+            match_image_writer = ImageResultWriter(frame_dir, match_image_save_dir, match_result)
             self.post_process_list.append(match_image_writer)
 
             if self.opt.output_format == 'video':

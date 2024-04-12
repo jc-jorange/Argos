@@ -14,8 +14,6 @@ class TextResultWriter(BasePost):
             result_name: str,
             result: wr.S_default_result,
             dtype: wr.E_text_result_type,
-            *args,
-            **kwargs
     ):
         super().__init__()
         self.save_dir = os.path.join(save_dir, result_name)
@@ -36,8 +34,6 @@ class ImageResultWriter(BasePost):
             input_dir: str,
             save_dir: str,
             result_dir: str,
-            *args,
-            **kwargs
     ):
         super().__init__()
         self.input_dir = input_dir
@@ -117,9 +113,7 @@ class VideoResultWriter(BasePost):
             self,
             frame_dir: str,
             save_dir: str,
-            *args,
             frame_rate=24,
-            **kwargs
     ):
         super().__init__()
         self.frame_dir = frame_dir

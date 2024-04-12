@@ -529,7 +529,7 @@ def efficientnet(width_coefficient=None, depth_coefficient=None, image_size=None
 
 
 def get_model_params(model_name, override_params):
-    """Get the block args and global params for a given model name.
+    """Get the block args and global_process params for a given model name.
 
     Args:
         model_name (str): Model's name.

@@ -1,6 +1,6 @@
 import os
 
-from ..multiprocess import BaseProcess, EMultiprocess
+from lib.multiprocess import BaseProcess, EMultiprocess
 from lib.postprocess import BasePost
 from lib.postprocess.result_writer import ImageResultWriter, VideoResultWriter
 import lib.postprocess.utils.write_result as wr
