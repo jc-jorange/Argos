@@ -5,8 +5,8 @@ import numpy
 from enum import Enum, unique
 import torch
 
-from lib.multiprocess.SharedMemory import ProducerBucket, EQueueType, EResultType
-from lib.multiprocess import BaseProcess
+from lib.multiprocess.SharedMemory import ProducerHub, EQueueType, EResultType
+from lib.multiprocess import ConsumerProcess
 from lib.tracker.multitracker import MCJDETracker
 from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.timer import Timer
@@ -19,7 +19,7 @@ class ETrackInfo(Enum):
     Fps = 3
 
 
-class TrackerProcess(BaseProcess):
+class TrackerProcess(ConsumerProcess):
     prefix = 'Argus-SubProcess-Tracker_'
     dir_name = 'track'
     log_name = 'Track_Log'
@@ -33,7 +33,7 @@ class TrackerProcess(BaseProcess):
 
         self.tracker = None
         self.info_data = None
-        self.all_frame_results = wr.S_default_result
+        self.all_frame_results = wr.S_default_save
         self.current_track_result = None
 
         self.timer_loop = Timer()
@@ -127,8 +127,8 @@ class TrackerProcess(BaseProcess):
             self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
 
             if self.frame_id % 10 == 0 and self.frame_id != 0:
-                self.save_result_to_file(self.main_output_dir, self.all_frame_results)
-                self.all_frame_results = wr.S_default_result
+                self.save_result_to_file(self.main_save_dir, self.all_frame_results)
+                self.all_frame_results = wr.S_default_save
 
                 self.logger.info(
                     f'Processing frame {self.frame_id}: '
@@ -153,7 +153,7 @@ class TrackerProcess(BaseProcess):
                 )
             )
 
-        self.save_result_to_file(self.main_output_dir, self.all_frame_results)
+        self.save_result_to_file(self.main_save_dir, self.all_frame_results)
         del self.all_frame_results
 
         while track_to_predict_queue.qsize() > 0:

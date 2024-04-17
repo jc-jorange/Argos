@@ -6,7 +6,7 @@ import os
 import numpy as np
 import torch
 
-from lib.multiprocess import BaseProcess
+from lib.multiprocess import ProducerProcess
 from lib.multiprocess.SharedMemory import EQueueType
 from lib.input_data_loader import EInputDataType, loader_factory, BaseInputDataLoader
 
@@ -17,7 +17,7 @@ class EImageInfo(Enum):
     Size = 2
 
 
-class ImageLoaderProcess(BaseProcess):
+class ImageLoaderProcess(ProducerProcess):
     prefix = 'Argus-SubProcess-ImageLoader_'
     dir_name = 'input'
     log_name = 'Image_Loader_Log'
@@ -29,7 +29,7 @@ class ImageLoaderProcess(BaseProcess):
         super(ImageLoaderProcess, self).__init__(*args, **kwargs)
 
         self.frame_dir = None if self.opt.output_format == 'text' \
-            else self.making_dir(self.main_output_dir, self.opt.frame_dir)
+            else self.making_dir(self.main_save_dir, self.opt.frame_dir)
 
         self.data_loader = None
 

@@ -12,7 +12,7 @@ class TextResultWriter(BasePost):
             self,
             save_dir: str,
             result_name: str,
-            result: wr.S_default_result,
+            result: wr.S_default_save,
             dtype: wr.E_text_result_type,
     ):
         super().__init__()

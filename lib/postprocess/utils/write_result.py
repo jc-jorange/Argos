@@ -5,7 +5,7 @@ from enum import Enum, unique
 from collections import defaultdict
 
 # {frame: {subframe: ({class: {ID: ((tlwh), score)}}, fps)}}
-S_default_result = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
+S_default_save = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
 
 @unique
 class E_text_result_type(Enum):

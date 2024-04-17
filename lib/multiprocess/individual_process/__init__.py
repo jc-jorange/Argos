@@ -1,22 +1,8 @@
-from enum import Enum, unique
+from .producer import E_Indi_Process_Producer, factory_indi_process_producer
+from .consumer import E_Indi_Process_Consumer, factory_indi_process_consumer
+from .post import E_Indi_Process_Post, factory_indi_process_post
 
-from .MP_ImageLoader import ImageLoaderProcess
-from .MP_Tracker import TrackerProcess
-from .MP_PathPredict import PathPredictProcess
-from .MP_IndiPost import IndividualPostProcess
-
-
-@unique
-class E_Indi_Process(Enum):
-    ImageLoader = 1
-    Tracker = 2
-    Predictor = 3
-    IndiPost = 4
-
-
-factory_indi_process = {
-    E_Indi_Process.ImageLoader.name: ImageLoaderProcess,
-    E_Indi_Process.Tracker.name: TrackerProcess,
-    E_Indi_Process.Predictor.name: PathPredictProcess,
-    E_Indi_Process.IndiPost.name: IndividualPostProcess,
-}
+factory_indi_process_all = {}
+factory_indi_process_all.update(factory_indi_process_producer)
+factory_indi_process_all.update(factory_indi_process_consumer)
+factory_indi_process_all.update(factory_indi_process_post)

@@ -6,7 +6,7 @@ import json
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
-from lib.multiprocess.SharedMemory import ProducerBucket, EQueueType
+from lib.multiprocess.SharedMemory import ProducerHub, EQueueType
 from lib.opts import opts
 from lib.model import load_model, save_model, BaseModel
 from lib.utils.logger import ALL_LoggerContainer
@@ -14,9 +14,9 @@ from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
 from lib.tracker.utils.utils import mkdir_if_missing
 from lib.multiprocess import process_factory, EMultiprocess
-from lib.multiprocess.individual_process.MP_IndiPost import IndividualPostProcess
-from lib.multiprocess.global_process.MP_GlobalIdMatch import GlobalIdMatchProcess
-from lib.multiprocess.global_process.MP_GlobalPost import GlobalPostProcess
+from lib.multiprocess.individual_process.post.MP_IndiPost import IndividualPostProcess
+from lib.multiprocess.global_process.consumer.MP_MultiCameraIdMatch import MultiCameraIdMatchProcess
+from lib.multiprocess.global_process.post.MP_GlobalPost import GlobalPostProcess
 from lib.matchor.MultiCameraMatch.CenterRayIntersect import CenterRayIntersectMatchor
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -172,7 +172,7 @@ def track(opt_data):
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
 
     for model_index in range(sub_processor_num):
-        shared_container = ProducerBucket(opt_data)
+        shared_container = ProducerHub(opt_data)
         container_shared_array[model_index] = shared_container
         container_multiprocess_queue[model_index] = shared_container.queue_dict[EQueueType.PredictResultSend]
 
@@ -182,11 +182,11 @@ def track(opt_data):
             container_multiprocess[model_index][process_type] = processor
             processor.start()
 
-            container_multiprocess_dir[model_index][process_type] = processor.main_output_dir
+            container_multiprocess_dir[model_index][process_type] = processor.main_save_dir
 
     main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
-    global_match_shared_container = ProducerBucket(opt_data)
-    global_id_matchor = GlobalIdMatchProcess(
+    global_match_shared_container = ProducerHub(opt_data)
+    global_id_matchor = MultiCameraIdMatchProcess(
         container_multiprocess_queue, CenterRayIntersectMatchor, global_match_shared_container, -1, opt_data
     )
     global_id_matchor.start()

@@ -4,7 +4,7 @@ from typing import Type
 from collections import defaultdict
 import numpy
 
-from lib.multiprocess import BaseProcess
+from lib.multiprocess import ConsumerProcess
 from lib.matchor import BaseMatchor
 from lib.postprocess.utils.write_result import convert_numpy_to_dict
 from lib.postprocess.utils import write_result as wr
@@ -49,7 +49,7 @@ intrinsic_parameters_dict = {
 }
 
 
-class GlobalIdMatchProcess(BaseProcess):
+class MultiCameraIdMatchProcess(ConsumerProcess):
     prefix = 'Argus-SubProcess-Global_ID_Match_'
     dir_name = 'id_match'
     log_name = 'ID_Match_Log'
@@ -66,7 +66,7 @@ class GlobalIdMatchProcess(BaseProcess):
 
         self.match_result_dir_dict = {}
         for i, queue in queue_dict.items():
-            self.match_result_dir_dict[i] = self.making_dir(self.main_output_dir, str(i+1))
+            self.match_result_dir_dict[i] = self.making_dir(self.main_save_dir, str(i + 1))
 
         self.matchor = matchor(intrinsic_parameters_dict)
 

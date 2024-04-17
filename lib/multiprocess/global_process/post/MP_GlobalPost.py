@@ -1,12 +1,12 @@
 import os
 
-from lib.multiprocess import BaseProcess, EMultiprocess
+from lib.multiprocess import PostProcess
 from lib.postprocess import BasePost
 from lib.postprocess.result_writer import ImageResultWriter, VideoResultWriter
 import lib.postprocess.utils.write_result as wr
 
 
-class GlobalPostProcess(BaseProcess):
+class GlobalPostProcess(PostProcess):
     prefix = 'Argus-SubProcess-GlobalPostProcess_'
 
     def __init__(self,

@@ -4,14 +4,14 @@ from typing import Type
 from collections import defaultdict
 from multiprocessing import queues
 
-from lib.multiprocess import BaseProcess
+from lib.multiprocess import ConsumerProcess
 from lib.multiprocess.SharedMemory import EQueueType
 from lib.predictor import BasePredictor, predictor_factory
 from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.utils import *
 
 
-class PathPredictProcess(BaseProcess):
+class PathPredictProcess(ConsumerProcess):
     prefix = 'Argus-SubProcess-PathPredictProcess_'
     dir_name = 'predict'
     log_name = 'Path_Predict_Log'
@@ -44,7 +44,7 @@ class PathPredictProcess(BaseProcess):
                 frame = track_result[0]
                 self.current_track_result = track_result[1]
 
-                self.save_result_to_file(self.main_output_dir, self.all_predict_result)
+                self.save_result_to_file(self.main_save_dir, self.all_predict_result)
                 # del self.all_predict_result
                 self.all_predict_result = {}
 
@@ -84,7 +84,7 @@ class PathPredictProcess(BaseProcess):
                 result_each_subframe[subframe] = (result_class, fps)
                 self.all_predict_result[frame].update(result_each_subframe)
 
-        self.save_result_to_file(self.main_output_dir, self.all_predict_result)
+        self.save_result_to_file(self.main_save_dir, self.all_predict_result)
         del self.all_predict_result
 
         while predict_queue.qsize() > 0:
