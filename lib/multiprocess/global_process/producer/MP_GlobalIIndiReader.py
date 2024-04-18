@@ -17,9 +17,12 @@ class IndiResultsReader(ConsumerProcess):
     save_type = []
 
     def __init__(self,
+                 indi_results: dict,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.all_indi_results = indi_results
 
     def run_action(self) -> None:
         super().run_action()

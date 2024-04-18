@@ -36,7 +36,7 @@ dict_ProducerOutput_Indi = {
 }
 
 dict_ProducerOutput_Global = {
-    E_ProducerOutputName_Global.PredictAll: ()
+    E_ProducerOutputName_Global.PredictAll: (E_SharedSaveType.Queue, (1,), 0)
 }
 
 
