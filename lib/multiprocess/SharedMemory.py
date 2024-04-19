@@ -25,6 +25,7 @@ class E_ProducerOutputName_Indi(Enum):
 @unique
 class E_ProducerOutputName_Global(Enum):
     PredictAll = 1
+    bInputLoading = 2
 
 
 format_ProducerOutput = (E_SharedSaveType, tuple, int)
@@ -43,13 +44,6 @@ dict_ProducerOutput_Global = {
 class ProducerHub:
     def __init__(self, opt):
         self.opt = opt
-        self.device = ''
-
-        if self.opt.realtime:
-            dict_ProducerOutput_Indi[E_ProducerOutputName_Indi.ImageData] = (E_SharedSaveType.Tensor, self.opt.net_input_shape, 0)
-        self.output = {}
-        for k, v in dict_ProducerOutput_Indi.items():
-            self.output[k] = self.generate_output_value(v)
 
     def generate_output_value(self, output_format: format_ProducerOutput) -> any:
         data_type: E_SharedSaveType = output_format[0]
@@ -86,11 +80,34 @@ class ProducerHub:
         return output_value
 
 
+class ProducerHub_Indi(ProducerHub):
+    def __init__(self,
+                 *args,
+                 **kwargs
+                 ):
+        super(ProducerHub_Indi, self).__init__(*args, **kwargs)
+
+        if self.opt.realtime:
+            dict_ProducerOutput_Indi[E_ProducerOutputName_Indi.ImageData] = \
+                (E_SharedSaveType.Tensor, self.opt.net_input_shape, 0)
+        self.output = {}
+        for k, v in dict_ProducerOutput_Indi.items():
+            self.output[k] = self.generate_output_value(v)
+
+
+class ProducerHub_Global(ProducerHub):
+    def __init__(self,
+                 *args,
+                 **kwargs
+                 ):
+        super(ProducerHub_Global, self).__init__(*args, **kwargs)
+
+
 class ConsumerOutputPort:
-    def __init__(self, opt, output_type: str, data_shape: tuple):
+    def __init__(self, opt, output_type: E_SharedSaveType, data_shape: tuple):
         self.opt = opt
 
-        self._output_type = E_SharedSaveType[output_type]
+        self._output_type = output_type
         self._data_shape = None
         self.output = None
 

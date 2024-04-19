@@ -1,13 +1,5 @@
-import multiprocessing
-import time
-from typing import Type
-from collections import defaultdict
-import numpy
-
 from lib.multiprocess import ConsumerProcess
-from lib.matchor import BaseMatchor
-from lib.postprocess.utils.write_result import convert_numpy_to_dict
-from lib.postprocess.utils import write_result as wr
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Global
 
 
 class IndiResultsReader(ConsumerProcess):

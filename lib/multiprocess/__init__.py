@@ -8,6 +8,7 @@ from lib.utils.logger import ALL_LoggerContainer
 from lib.tracker.utils.utils import mkdir_if_missing
 import lib.postprocess.utils.write_result as wr
 from lib.multiprocess.SharedMemory import ProducerHub, ConsumerOutputPort
+from lib.multiprocess.SharedMemory import E_SharedSaveType
 
 
 class BaseProcess(Process):
@@ -116,22 +117,24 @@ class ProducerProcess(BaseProcess):
 class ConsumerProcess(BaseProcess):
     def __init__(
             self,
-            output_type: str,
+            output_type: E_SharedSaveType,
             data_shape: tuple,
+            last_process_port: ConsumerOutputPort = None,
             *args,
             **kwargs,
     ) -> None:
         super(ConsumerProcess, self).__init__(*args, **kwargs,)
-        self.OutputPort = ConsumerOutputPort(self.opt, output_type, data_shape)
+        self.output_port = ConsumerOutputPort(self.opt, output_type, data_shape)
+        self.last_process_port = last_process_port
 
 
 class PostProcess(BaseProcess):
     def __init__(
             self,
-            output_type: str,
+            output_type: E_SharedSaveType,
             data_shape: tuple,
             *args,
             **kwargs,
     ) -> None:
         super(PostProcess, self).__init__(*args, **kwargs,)
-        self.OutputPort = ConsumerOutputPort(self.opt, output_type, data_shape)
+        self.output_port = ConsumerOutputPort(self.opt, output_type, data_shape)

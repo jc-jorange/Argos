@@ -5,7 +5,7 @@ from collections import defaultdict
 from multiprocessing import queues
 
 from lib.multiprocess import ConsumerProcess
-from lib.multiprocess.SharedMemory import EQueueType
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi
 from lib.predictor import BasePredictor, predictor_factory
 from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.utils import *
@@ -35,9 +35,9 @@ class PathPredictProcess(ConsumerProcess):
         self.predictor.time_0 = time.perf_counter()
         frame = 0
         subframe = -1
-        track_queue = self.shared_container.queue_dict[EQueueType.TrackerResultSend]
-        predict_queue = self.shared_container.queue_dict[EQueueType.PredictResultSend]
-        while self.shared_container.b_input_loading.value:
+        track_queue = self.last_process_port.output
+        predict_queue = self.output_port.output
+        while self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading].value:
             t1 = time.perf_counter()
             try:
                 track_result = track_queue.get(block=False)

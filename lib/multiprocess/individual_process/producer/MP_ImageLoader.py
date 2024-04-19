@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from lib.multiprocess import ProducerProcess
-from lib.multiprocess.SharedMemory import EQueueType
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi
 from lib.input_data_loader import EInputDataType, loader_factory, BaseInputDataLoader
 
 
@@ -38,8 +38,6 @@ class ImageLoaderProcess(ProducerProcess):
 
         self.load_time = 0.0
 
-        self.real_time_mode = False
-
     def run_begin(self) -> None:
         super(ImageLoaderProcess, self).run_begin()
 
@@ -56,20 +54,24 @@ class ImageLoaderProcess(ProducerProcess):
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        input_queue = self.shared_container.queue_dict[EQueueType.LoadResultSend]
+        hub_image_data = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageData]
+        hub_image_origin_shape = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageOriginShape]
+        hub_frame_id = self.producer_result_hub.output[E_ProducerOutputName_Indi.FrameID]
+        hub_b_loading = self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading]
 
         try:
             for path, img, img_0 in self.data_loader:
                 if not self.opt.realtime:
-                    while input_queue.qsize() > self.opt.load_buffer:
+                    while hub_image_data.qsize() > self.opt.load_buffer:
                         pass
                     img_send = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
-                    input_queue.put((self.data_loader.count, img_send, img_0.shape))
+                    hub_image_data.put((self.data_loader.count, img_send, img_0.shape))
                     del img_send
+                else:
+                    hub_image_data[:] = img[:]
 
-                self.shared_container.set_data(img)
-                self.shared_container.input_frame_id.value = self.data_loader.count
-                self.shared_container.set_origin_shape(img_0.shape)
+                hub_frame_id.value = self.data_loader.count
+                hub_image_origin_shape[:] = img_0.shape[:]
 
                 if self.frame_dir:
                     cv2.imwrite(
@@ -82,11 +84,11 @@ class ImageLoaderProcess(ProducerProcess):
         except:
             traceback.print_exc()
             pass
+        if not self.opt.realtime:
+            while not hub_image_data.empty():
+                pass
 
-        while not input_queue.empty():
-            pass
-
-        self.shared_container.b_input_loading.value = False
+        hub_b_loading.value = False
 
         end_time = time.perf_counter()
         self.load_time = end_time - start_time

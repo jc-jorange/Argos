@@ -5,7 +5,7 @@ import numpy
 from enum import Enum, unique
 import torch
 
-from lib.multiprocess.SharedMemory import ProducerHub, EQueueType, EResultType
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi, E_SharedSaveType
 from lib.multiprocess import ConsumerProcess
 from lib.tracker.multitracker import MCJDETracker
 from lib.postprocess.utils import write_result as wr
@@ -26,10 +26,12 @@ class TrackerProcess(ConsumerProcess):
     save_type = [wr.E_text_result_type.raw, wr.E_text_result_type.mot]
 
     def __init__(self,
+                 output_type=E_SharedSaveType.Queue,
+                 output_shape=(1,),
                  *args,
                  **kwargs
                  ):
-        super().__init__(*args, **kwargs)
+        super().__init__(output_type, output_shape, *args, **kwargs)
 
         self.tracker = None
         self.info_data = None
@@ -58,26 +60,28 @@ class TrackerProcess(ConsumerProcess):
         super(TrackerProcess, self).run_action()
         self.logger.info('Start tracking')
 
-        input_to_track_queue = self.shared_container.queue_dict[EQueueType.LoadResultSend]
-        track_to_predict_queue = self.shared_container.queue_dict[EQueueType.TrackerResultSend]
+        hub_image_data = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageData]
+        hub_b_loading = self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading]
+        hub_image_origin_shape = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageOriginShape]
+        hub_frame_id = self.producer_result_hub.output[E_ProducerOutputName_Indi.FrameID]
 
         origin_shape = (0, 0, 0)
 
-        while self.shared_container.b_input_loading.value:
+        while hub_b_loading.value:
             # loop timer start record
             self.timer_loop.tic()
 
             if not self.opt.realtime:
                 try:
-                    input_frame_id, img, origin_shape = input_to_track_queue.get(block=False)
+                    input_frame_id, img, origin_shape = hub_image_data.get(block=False)
                 except:
                     continue
             else:
-                input_frame_id = self.shared_container.input_frame_id.value
-                img = self.shared_container.resized_tensor
+                input_frame_id = hub_frame_id.value
+                img = hub_image_data
 
                 if self.frame_id == 1:
-                    origin_shape = self.shared_container.get_origin_shape()
+                    origin_shape = hub_image_origin_shape[:]
 
             # update frame id
             self.frame_id += 1
@@ -111,9 +115,7 @@ class TrackerProcess(ConsumerProcess):
                         self.current_track_result[cls_id, t_id] = xywh
             self.all_frame_results[input_frame_id] = {0: (result_per_subframe, self.fps_loop_avg)}
 
-            # result_numpy = numpy.frombuffer(self.shared_container.result_dict[EResultType.TrackResult], dtype=ctypes.c_float)
-
-            track_to_predict_queue.put((self.frame_id, self.current_track_result))
+            self.output_port.output.put((self.frame_id, self.current_track_result))
 
             # loop timer end record
             self.timer_loop.toc()
@@ -156,8 +158,8 @@ class TrackerProcess(ConsumerProcess):
         self.save_result_to_file(self.main_save_dir, self.all_frame_results)
         del self.all_frame_results
 
-        while track_to_predict_queue.qsize() > 0:
-            track_to_predict_queue.get()
+        while self.output_port.output.qsize() > 0:
+            self.output_port.output.get()
 
     def run_end(self) -> None:
         super().run_end()
