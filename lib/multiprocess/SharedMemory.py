@@ -20,12 +20,18 @@ class E_ProducerOutputName_Indi(Enum):
     ImageOriginShape = 2
     ImageData = 3
     bInputLoading = 4
+    CameraTransform = 5
 
 
 @unique
 class E_ProducerOutputName_Global(Enum):
+    bInputLoading = 1
+
+
+@unique
+class E_ProducerOutputName_Global_PassThrough(Enum):
     PredictAll = 1
-    bInputLoading = 2
+    CameraTransformAll = 2
 
 
 format_ProducerOutput = (E_SharedSaveType, tuple, int)
@@ -33,17 +39,24 @@ dict_ProducerOutput_Indi = {
     E_ProducerOutputName_Indi.FrameID: (E_SharedSaveType.SharedValue_Int, (1,), 0),
     E_ProducerOutputName_Indi.ImageOriginShape: (E_SharedSaveType.SharedArray_Int, (3,), 0),
     E_ProducerOutputName_Indi.ImageData: (E_SharedSaveType.Queue, (1,), 0),
-    E_ProducerOutputName_Indi.bInputLoading: (E_SharedSaveType.SharedValue_Int, (1,), 1)
+    E_ProducerOutputName_Indi.bInputLoading: (E_SharedSaveType.SharedValue_Int, (1,), 1),
+    E_ProducerOutputName_Indi.CameraTransform: (E_SharedSaveType.SharedArray_Float, (4, 4), 0),
 }
 
 dict_ProducerOutput_Global = {
-    E_ProducerOutputName_Global.PredictAll: (E_SharedSaveType.Queue, (1,), 0)
+    E_ProducerOutputName_Global.bInputLoading: (E_SharedSaveType.SharedValue_Int, (1,), 1),
+}
+
+dict_ProducerOutput_Global_PassThrough = {
+    E_ProducerOutputName_Global_PassThrough.PredictAll: (E_SharedSaveType.Queue, (1,), 0),
+    E_ProducerOutputName_Global_PassThrough.CameraTransformAll: (E_SharedSaveType.Queue, (1,), 0),
 }
 
 
 class ProducerHub:
     def __init__(self, opt):
         self.opt = opt
+        self.output = None
 
     def generate_output_value(self, output_format: format_ProducerOutput) -> any:
         data_type: E_SharedSaveType = output_format[0]
@@ -97,14 +110,31 @@ class ProducerHub_Indi(ProducerHub):
 
 class ProducerHub_Global(ProducerHub):
     def __init__(self,
+                 indi_hub: dict,
                  *args,
                  **kwargs
                  ):
         super(ProducerHub_Global, self).__init__(*args, **kwargs)
 
+        self.indi_hub_dict = indi_hub
+
+        self.output_passthrough = {}
+        for k_i, v_i in self.indi_hub_dict.items():
+            self.output_passthrough[k_i] = {}
+            for k_g, v_g in dict_ProducerOutput_Global_PassThrough.items():
+                self.output_passthrough[k_i][k_g] = self.generate_output_value(v_g)
+
+        self.output = {}
+        for k, v in dict_ProducerOutput_Global.items():
+            self.output[k] = self.generate_output_value(v)
+
 
 class ConsumerOutputPort:
-    def __init__(self, opt, output_type: E_SharedSaveType, data_shape: tuple):
+    def __init__(self,
+                 opt,
+                 output_type: E_SharedSaveType,
+                 data_shape: tuple
+                 ):
         self.opt = opt
 
         self._output_type = output_type

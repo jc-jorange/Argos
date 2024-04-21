@@ -8,6 +8,6 @@ class E_Global_Process_Post(Enum):
     IndiResultsReader = 1
 
 
-factory_global_process = {
+factory_global_process_producer = {
     E_Global_Process_Post.IndiResultsReader.name: IndiResultsReader,
 }

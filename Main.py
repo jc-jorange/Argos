@@ -6,18 +6,20 @@ import json
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
-from lib.multiprocess.SharedMemory import ProducerHub, EQueueType
+from lib.multiprocess.SharedMemory import ProducerHub_Indi, ProducerHub_Global
 from lib.opts import opts
 from lib.model import load_model, save_model, BaseModel
 from lib.utils.logger import ALL_LoggerContainer
 from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
 from lib.tracker.utils.utils import mkdir_if_missing
-from lib.multiprocess import process_factory, EMultiprocess
-from lib.multiprocess.individual_process.post.MP_IndiPost import IndividualPostProcess
-from lib.multiprocess.global_process.consumer.MP_MultiCameraIdMatch import MultiCameraIdMatchProcess
-from lib.multiprocess.global_process.post.MP_GlobalPost import GlobalPostProcess
-from lib.matchor.MultiCameraMatch.CenterRayIntersect import CenterRayIntersectMatchor
+from lib.multiprocess.individual_process.producer import factory_indi_process_producer
+from lib.multiprocess.individual_process.consumer import factory_indi_process_consumer, E_Indi_Process_Consumer
+from lib.multiprocess.individual_process.post import factory_indi_process_post, E_Indi_Process_Post
+from lib.multiprocess.global_process.producer import factory_global_process_producer
+from lib.multiprocess.global_process.consumer import factory_global_process_consumer
+from lib.multiprocess.global_process.post import factory_global_process_post, E_Global_Process_Post
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi, E_ProducerOutputName_Global
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -165,74 +167,95 @@ def track(opt_data):
 
     container_multiprocess = defaultdict(dict)
     container_multiprocess_dir = defaultdict(dict)
-    container_multiprocess_queue = defaultdict(mp.Queue)
-    container_shared_array = {}
+    container_indi_producer_hub_dict = {}
+    indi_last_consumer_dict = {}
 
     sub_processor_num = len(opt_data.input_path)
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
 
     for model_index in range(sub_processor_num):
-        shared_container = ProducerHub(opt_data)
-        container_shared_array[model_index] = shared_container
-        container_multiprocess_queue[model_index] = shared_container.queue_dict[EQueueType.PredictResultSend]
+        indi_producer_hub = ProducerHub_Indi(opt_data)
+        container_indi_producer_hub_dict[model_index] = indi_producer_hub
 
-        for process_type, process_class in process_factory.items():
+        for process_type, process_class in factory_indi_process_producer.items():
             main_logger.info('-' * 5 + f'Setting {process_type.name} Sub-Processor {model_index}' + '-' * 5)
-            processor = process_class(shared_container, model_index, opt_data)
+            processor = process_class(indi_producer_hub, model_index, opt_data)
             container_multiprocess[model_index][process_type] = processor
             processor.start()
 
             container_multiprocess_dir[model_index][process_type] = processor.main_save_dir
 
-    main_logger.info('-' * 5 + f'Setting Global Id Matching Sub-Processor')
-    global_match_shared_container = ProducerHub(opt_data)
-    global_id_matchor = MultiCameraIdMatchProcess(
-        container_multiprocess_queue, CenterRayIntersectMatchor, global_match_shared_container, -1, opt_data
-    )
-    global_id_matchor.start()
+        last_consumer_port = None
+        for process_type, process_class in factory_indi_process_consumer.items():
+            main_logger.info('-' * 5 + f'Setting {process_type.name} Sub-Processor {model_index}' + '-' * 5)
+            processor = process_class(indi_producer_hub, model_index, opt_data, last_consumer_port=last_consumer_port)
+            last_consumer_port = processor.output_port
+            indi_last_consumer_dict[model_index] = last_consumer_port
+            container_multiprocess[model_index][process_type] = processor
+            processor.start()
 
-    for process_type, process_class in process_factory.items():
-        for model_index in range(sub_processor_num):
-            process_ = container_multiprocess[model_index][process_type]
+            container_multiprocess_dir[model_index][process_type] = processor.main_save_dir
+
+    global_producer_hub = ProducerHub_Global(container_indi_producer_hub_dict, opt_data)
+    for process_type, process_class in factory_global_process_producer.items():
+        main_logger.info('-' * 5 + f'Setting {process_type.name} Global-Processor' + '-' * 5)
+        processor = process_class(
+            container_indi_producer_hub_dict, indi_last_consumer_dict,
+            global_producer_hub, sub_processor_num + 1, opt_data
+        )
+        # container_multiprocess[sub_processor_num + 1][process_type] = processor
+        processor.start()
+
+        container_multiprocess_dir[sub_processor_num + 1][process_type] = processor.main_save_dir
+
+    last_consumer_port = None
+    for process_type, process_class in factory_global_process_consumer.items():
+        main_logger.info('-' * 5 + f'Setting {process_type.name} Global-Processor' + '-' * 5)
+        processor = process_class(
+            global_producer_hub, sub_processor_num + 1, opt_data, last_consumer_port=last_consumer_port
+        )
+        last_consumer_port = processor.output_port
+        # container_multiprocess[sub_processor_num + 1][process_type] = processor
+        processor.start()
+
+        container_multiprocess_dir[sub_processor_num + 1][process_type] = processor.main_save_dir
+
+    for model_index, each_index_process in container_multiprocess:
+        for process_type, process_class in each_index_process.items():
+            process_ = process_class
             main_logger.info('-' * 5 + f'Start {process_class.name} Sub-Process No.{model_index}' + '-' * 5)
             process_.process_run_action()
 
-    main_logger.info('-' * 5 + f'Start Global Id Matching Sub-Processor')
-    global_id_matchor.process_run_action()
-
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
         for i, p in container_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[EMultiprocess.Tracker].is_alive()
-
-    global_match_shared_container.b_input_loading.value = False
+            b_check_tracker = b_check_tracker or p[E_Indi_Process_Consumer.Tracker].is_alive()
+            container_indi_producer_hub_dict[i].output[E_ProducerOutputName_Indi.bInputLoading].value = False
+    global_producer_hub.output[E_ProducerOutputName_Global.bInputLoading].value = False
 
     for model_index in range(sub_processor_num):
-        main_logger.info('-' * 5 + f'Setting Individual PostProcess Sub-Processor {model_index}')
-        indi_post = IndividualPostProcess(
-            container_multiprocess_dir,
-            container_shared_array[model_index], model_index, opt_data
-        )
-        container_multiprocess[model_index][EMultiprocess.IndiPost] = indi_post
-        indi_post.start()
-        indi_post.process_run_action()
+        for process_type, process_class in factory_indi_process_post.items():
+            main_logger.info('-' * 5 + f'Setting {process_type.name} Post-Processor {model_index}' + '-' * 5)
+            processor = process_class(container_multiprocess_dir, model_index, opt_data)
+            container_multiprocess[model_index][process_type] = processor
+            processor.start()
+            processor.process_run_action()
 
-    for i_process, match_result_dir in global_id_matchor.match_result_dir_dict.items():
-        container_multiprocess_dir[i_process].update({EMultiprocess.GlobalMatching: match_result_dir})
-    main_logger.info('-' * 5 + f'Setting Global PostProcess Sub-Processor')
-    global_post = GlobalPostProcess(
-        container_multiprocess_dir,
-        global_match_shared_container, -1, opt_data
-    )
-    global_post.start()
-    global_post.process_run_action()
+    global_post = None
+    for process_type, process_class in factory_global_process_post.items():
+        main_logger.info('-' * 5 + f'Setting {process_type.name} Post-Processor {sub_processor_num + 1}' + '-' * 5)
+        processor = process_class(container_multiprocess_dir, sub_processor_num + 1, opt_data)
+        # container_multiprocess[sub_processor_num + 1][process_type] = processor
+        global_post = processor
+        processor.start()
+        processor.process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
         for i, p in container_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[EMultiprocess.IndiPost].is_alive()
+            b_check_tracker = b_check_tracker or p[E_Indi_Process_Post.IndiPost].is_alive()
 
     while global_post.is_alive():
         pass

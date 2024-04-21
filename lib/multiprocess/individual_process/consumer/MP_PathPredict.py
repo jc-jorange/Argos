@@ -5,7 +5,7 @@ from collections import defaultdict
 from multiprocessing import queues
 
 from lib.multiprocess import ConsumerProcess
-from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi, E_SharedSaveType
 from lib.predictor import BasePredictor, predictor_factory
 from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.utils import *
@@ -18,10 +18,12 @@ class PathPredictProcess(ConsumerProcess):
     save_type = [wr.E_text_result_type.raw]
 
     def __init__(self,
+                 output_type=E_SharedSaveType.Queue,
+                 output_shape=(1,),
                  *args,
                  **kwargs
                  ):
-        super().__init__(*args, **kwargs)
+        super().__init__(output_type, output_shape, *args, **kwargs)
 
         self.current_track_result = None
         self.current_predict_result = None

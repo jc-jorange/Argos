@@ -8,6 +8,6 @@ class E_Global_Process_Consumer(Enum):
     MultiCameraIdMatchProcess = 1
 
 
-factory_global_process_Consumer = {
+factory_global_process_consumer = {
     E_Global_Process_Consumer.GlobalMatching.name: MultiCameraIdMatchProcess,
 }

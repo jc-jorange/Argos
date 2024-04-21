@@ -5,10 +5,12 @@ from collections import defaultdict
 import numpy
 
 from lib.multiprocess import ConsumerProcess
-from lib.multiprocess.SharedMemory import E_ProducerOutputName_Global
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Global, E_ProducerOutputName_Global_PassThrough, E_SharedSaveType
+from lib.multiprocess.SharedMemory import ProducerHub_Global
 from lib.matchor import BaseMatchor
 from lib.postprocess.utils.write_result import convert_numpy_to_dict
 from lib.postprocess.utils import write_result as wr
+from lib.matchor.MultiCameraMatch.CenterRayIntersect import CenterRayIntersectMatchor
 
 Test_Camera = {
             2: numpy.array([
@@ -57,15 +59,18 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
     save_type = [wr.E_text_result_type.raw]
 
     def __init__(self,
-                 matchor: Type[BaseMatchor],
+                 matchor: Type[BaseMatchor] = CenterRayIntersectMatchor,
+                 output_type=E_SharedSaveType.Queue,
+                 output_shape=(1,),
                  *args,
                  **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(output_type, output_shape, *args, **kwargs)
 
-        self.queue_dict = self.producer_result_hub.output
+        self.producer_result_hub: ProducerHub_Global
+        self.indi_result_queue_dict = self.producer_result_hub.output_passthrough
 
         self.match_result_dir_dict = {}
-        for i, queue in self.queue_dict.items():
+        for i, queue in self.indi_result_queue_dict.items():
             self.match_result_dir_dict[i] = self.making_dir(self.main_save_dir, str(i + 1))
 
         self.matchor = matchor(intrinsic_parameters_dict)
@@ -78,7 +83,8 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         while self.producer_result_hub.output[E_ProducerOutputName_Global.bInputLoading].b_input_loading.value:
             t1 = time.perf_counter()
             match_times = 0
-            for i_camera, each_queue in self.queue_dict.items():
+            for i_camera, each_pass in self.indi_result_queue_dict.items():
+                each_queue = each_pass[E_ProducerOutputName_Global_PassThrough.PredictAll]
                 match_times += 1
                 if i_camera == 0:
                     try:
