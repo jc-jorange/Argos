@@ -29,7 +29,7 @@ class ImageLoaderProcess(ProducerProcess):
         super(ImageLoaderProcess, self).__init__(*args, **kwargs)
 
         self.frame_dir = None if self.opt.output_format == 'text' \
-            else self.making_dir(self.main_save_dir, self.opt.frame_dir)
+            else self.making_dir(self.results_save_dir, self.opt.frame_dir)
 
         self.data_loader = None
 

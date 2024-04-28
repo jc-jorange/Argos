@@ -1,16 +1,8 @@
-from enum import Enum, unique
+from .producer import E_Global_Process_Producer, factory_global_process_producer
+from .consumer import E_Global_Process_Consumer, factory_global_process_consumer
+from .post import E_Global_Process_Post, factory_global_process_post
 
-from lib.multiprocess.global_process.consumer.MP_MultiCameraIdMatch import MultiCameraIdMatchProcess
-from lib.multiprocess.global_process.post.MP_GlobalPost import GlobalPostProcess
-
-
-@unique
-class E_Global_Process(Enum):
-    GlobalMatching = 1
-    GlobalPost = 2
-
-
-factory_global_process = {
-    E_Global_Process.GlobalMatching.name: MultiCameraIdMatchProcess,
-    E_Global_Process.GlobalPost.name: GlobalPostProcess,
-}
+factory_global_process_all = {}
+factory_global_process_all.update(factory_global_process_producer)
+factory_global_process_all.update(factory_global_process_consumer)
+factory_global_process_all.update(factory_global_process_post)

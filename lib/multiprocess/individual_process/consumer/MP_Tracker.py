@@ -65,18 +65,21 @@ class TrackerProcess(ConsumerProcess):
         hub_image_origin_shape = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageOriginShape]
         hub_frame_id = self.producer_result_hub.output[E_ProducerOutputName_Indi.FrameID]
 
+        b_track_over = False
         origin_shape = (0, 0, 0)
 
-        while hub_b_loading.value:
+        while hub_b_loading.value and not b_track_over:
             # loop timer start record
             self.timer_loop.tic()
 
             if not self.opt.realtime:
                 try:
+                    b_track_over = hub_image_data.empty()
                     input_frame_id, img, origin_shape = hub_image_data.get(block=False)
                 except:
                     continue
             else:
+                b_track_over = hub_b_loading.value
                 input_frame_id = hub_frame_id.value
                 img = hub_image_data
 
@@ -129,7 +132,7 @@ class TrackerProcess(ConsumerProcess):
             self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
 
             if self.frame_id % 10 == 0 and self.frame_id != 0:
-                self.save_result_to_file(self.main_save_dir, self.all_frame_results)
+                self.save_result_to_file(self.results_save_dir, self.all_frame_results)
                 self.all_frame_results = wr.S_default_save
 
                 self.logger.info(
@@ -155,7 +158,7 @@ class TrackerProcess(ConsumerProcess):
                 )
             )
 
-        self.save_result_to_file(self.main_save_dir, self.all_frame_results)
+        self.save_result_to_file(self.results_save_dir, self.all_frame_results)
         del self.all_frame_results
 
         while self.output_port.output.qsize() > 0:

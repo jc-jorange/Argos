@@ -46,7 +46,7 @@ class PathPredictProcess(ConsumerProcess):
                 frame = track_result[0]
                 self.current_track_result = track_result[1]
 
-                self.save_result_to_file(self.main_save_dir, self.all_predict_result)
+                self.save_result_to_file(self.results_save_dir, self.all_predict_result)
                 # del self.all_predict_result
                 self.all_predict_result = {}
 
@@ -86,7 +86,7 @@ class PathPredictProcess(ConsumerProcess):
                 result_each_subframe[subframe] = (result_class, fps)
                 self.all_predict_result[frame].update(result_each_subframe)
 
-        self.save_result_to_file(self.main_save_dir, self.all_predict_result)
+        self.save_result_to_file(self.results_save_dir, self.all_predict_result)
         del self.all_predict_result
 
         while predict_queue.qsize() > 0:

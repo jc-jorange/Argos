@@ -10,12 +10,20 @@ import lib.postprocess.utils.write_result as wr
 from lib.multiprocess.SharedMemory import ProducerHub, ConsumerOutputPort
 from lib.multiprocess.SharedMemory import E_SharedSaveType
 
+Process_Result_dir = 'result'
+
+
+@unique
+class E_Result_Dir_Type(Enum):
+    Index = 1
+
 
 class BaseProcess(Process):
     prefix = ''
     dir_name = ''
     log_name = ''
     save_type = []
+    save_dir_type: E_Result_Dir_Type = None
 
     def __init__(self,
                  producer_result_hub: ProducerHub,
@@ -30,7 +38,8 @@ class BaseProcess(Process):
         self.opt = opt
 
         self.results_to_save = wr.S_default_save
-        self.main_save_dir = self.making_dir(self.opt.save_dir, str(self.idx + 1), self.dir_name)
+        self.main_save_dir = self.making_dir(self.opt.save_dir, str(self.idx), self.dir_name)
+        self.results_save_dir = self.making_dir(self.main_save_dir, Process_Result_dir)
 
         self.name = self.prefix + str(idx)
 
@@ -131,10 +140,10 @@ class ConsumerProcess(BaseProcess):
 class PostProcess(BaseProcess):
     def __init__(
             self,
-            output_type: E_SharedSaveType,
-            data_shape: tuple,
+            # output_type: E_SharedSaveType,
+            # data_shape: tuple,
             *args,
             **kwargs,
     ) -> None:
         super(PostProcess, self).__init__(*args, **kwargs,)
-        self.output_port = ConsumerOutputPort(self.opt, output_type, data_shape)
+        # self.output_port = ConsumerOutputPort(self.opt, output_type, data_shape)

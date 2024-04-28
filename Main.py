@@ -165,8 +165,10 @@ def track(opt_data):
     for k, v in vars(opt_data).items():
         main_logger.info('  %s: %s' % (str(k), str(v)))
 
-    container_multiprocess = defaultdict(dict)
-    container_multiprocess_dir = defaultdict(dict)
+    container_indi_multiprocess = defaultdict(dict)
+    container_global_multiprocess = {}
+    container_indi_multiprocess_dir = defaultdict(dict)
+    container_global_multiprocess_dir = {}
     container_indi_producer_hub_dict = {}
     indi_last_consumer_dict = {}
 
@@ -178,74 +180,97 @@ def track(opt_data):
         container_indi_producer_hub_dict[model_index] = indi_producer_hub
 
         for process_type, process_class in factory_indi_process_producer.items():
-            main_logger.info('-' * 5 + f'Setting {process_type.name} Sub-Processor {model_index}' + '-' * 5)
+            main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
             processor = process_class(indi_producer_hub, model_index, opt_data)
-            container_multiprocess[model_index][process_type] = processor
+            container_indi_multiprocess[model_index][process_type] = processor
             processor.start()
 
-            container_multiprocess_dir[model_index][process_type] = processor.main_save_dir
+            container_indi_multiprocess_dir[model_index][process_type] = processor.main_save_dir
 
         last_consumer_port = None
         for process_type, process_class in factory_indi_process_consumer.items():
-            main_logger.info('-' * 5 + f'Setting {process_type.name} Sub-Processor {model_index}' + '-' * 5)
-            processor = process_class(indi_producer_hub, model_index, opt_data, last_consumer_port=last_consumer_port)
+            main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
+            processor = process_class(
+                producer_result_hub=indi_producer_hub,
+                idx=model_index,
+                opt=opt_data,
+                last_process_port=last_consumer_port,
+            )
             last_consumer_port = processor.output_port
             indi_last_consumer_dict[model_index] = last_consumer_port
-            container_multiprocess[model_index][process_type] = processor
+            container_indi_multiprocess[model_index][process_type] = processor
             processor.start()
 
-            container_multiprocess_dir[model_index][process_type] = processor.main_save_dir
+            container_indi_multiprocess_dir[model_index][process_type] = processor.main_save_dir
 
     global_producer_hub = ProducerHub_Global(container_indi_producer_hub_dict, opt_data)
     for process_type, process_class in factory_global_process_producer.items():
-        main_logger.info('-' * 5 + f'Setting {process_type.name} Global-Processor' + '-' * 5)
+        main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
         processor = process_class(
             container_indi_producer_hub_dict, indi_last_consumer_dict,
-            global_producer_hub, sub_processor_num + 1, opt_data
+            global_producer_hub, 0, opt_data
         )
-        # container_multiprocess[sub_processor_num + 1][process_type] = processor
+        container_global_multiprocess[process_type] = processor
         processor.start()
 
-        container_multiprocess_dir[sub_processor_num + 1][process_type] = processor.main_save_dir
+        container_global_multiprocess_dir[process_type] = processor.main_save_dir
 
     last_consumer_port = None
     for process_type, process_class in factory_global_process_consumer.items():
-        main_logger.info('-' * 5 + f'Setting {process_type.name} Global-Processor' + '-' * 5)
+        main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
         processor = process_class(
-            global_producer_hub, sub_processor_num + 1, opt_data, last_consumer_port=last_consumer_port
+            producer_result_hub=global_producer_hub,
+            idx=0,
+            opt=opt_data,
+            last_process_port=last_consumer_port,
         )
         last_consumer_port = processor.output_port
-        # container_multiprocess[sub_processor_num + 1][process_type] = processor
+        container_global_multiprocess[process_type] = processor
         processor.start()
 
-        container_multiprocess_dir[sub_processor_num + 1][process_type] = processor.main_save_dir
+        container_global_multiprocess_dir[process_type] = processor.main_save_dir
 
-    for model_index, each_index_process in container_multiprocess:
+    for model_index, each_index_process in container_indi_multiprocess.items():
         for process_type, process_class in each_index_process.items():
             process_ = process_class
-            main_logger.info('-' * 5 + f'Start {process_class.name} Sub-Process No.{model_index}' + '-' * 5)
+            main_logger.info('-' * 5 + f'Start {process_class} Sub-Process No.{model_index}' + '-' * 5)
             process_.process_run_action()
+
+    for process_type, process_class in container_global_multiprocess.items():
+        process_ = process_class
+        main_logger.info('-' * 5 + f'Start {process_class} Global-Process ' + '-' * 5)
+        process_.process_run_action()
 
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
-        for i, p in container_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[E_Indi_Process_Consumer.Tracker].is_alive()
-            container_indi_producer_hub_dict[i].output[E_ProducerOutputName_Indi.bInputLoading].value = False
+        for i, p in container_indi_multiprocess.items():
+            b_check_tracker = b_check_tracker or p[E_Indi_Process_Consumer.Tracker.name].is_alive()
+            container_indi_producer_hub_dict[i].output[E_ProducerOutputName_Indi.bInputLoading].value = b_check_tracker
     global_producer_hub.output[E_ProducerOutputName_Global.bInputLoading].value = False
 
     for model_index in range(sub_processor_num):
         for process_type, process_class in factory_indi_process_post.items():
-            main_logger.info('-' * 5 + f'Setting {process_type.name} Post-Processor {model_index}' + '-' * 5)
-            processor = process_class(container_multiprocess_dir, model_index, opt_data)
-            container_multiprocess[model_index][process_type] = processor
+            main_logger.info('-' * 5 + f'Setting {process_type} Post-Processor {model_index}' + '-' * 5)
+            processor = process_class(
+                producer_result_hub=container_indi_producer_hub_dict,
+                process_dir=container_indi_multiprocess_dir,
+                idx=model_index + 1,
+                opt=opt_data
+            )
+            container_indi_multiprocess[model_index][process_type] = processor
             processor.start()
             processor.process_run_action()
 
     global_post = None
     for process_type, process_class in factory_global_process_post.items():
-        main_logger.info('-' * 5 + f'Setting {process_type.name} Post-Processor {sub_processor_num + 1}' + '-' * 5)
-        processor = process_class(container_multiprocess_dir, sub_processor_num + 1, opt_data)
+        main_logger.info('-' * 5 + f'Setting {process_type} Global-Post-Processor' + '-' * 5)
+        processor = process_class(
+            producer_result_hub=global_producer_hub,
+            indi_process_dir=container_indi_multiprocess_dir,
+            global_process_dir=container_global_multiprocess_dir,
+            idx=0,
+            opt=opt_data)
         # container_multiprocess[sub_processor_num + 1][process_type] = processor
         global_post = processor
         processor.start()
@@ -254,8 +279,8 @@ def track(opt_data):
     b_check_tracker = True
     while b_check_tracker:
         b_check_tracker = False
-        for i, p in container_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[E_Indi_Process_Post.IndiPost].is_alive()
+        for i, p in container_indi_multiprocess.items():
+            b_check_tracker = b_check_tracker or p[E_Indi_Process_Post.IndiPost.name].is_alive()
 
     while global_post.is_alive():
         pass

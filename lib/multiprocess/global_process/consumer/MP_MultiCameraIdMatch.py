@@ -71,7 +71,7 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
 
         self.match_result_dir_dict = {}
         for i, queue in self.indi_result_queue_dict.items():
-            self.match_result_dir_dict[i] = self.making_dir(self.main_save_dir, str(i + 1))
+            self.match_result_dir_dict[i] = self.making_dir(self.results_save_dir, str(i + 1))
 
         self.matchor = matchor(intrinsic_parameters_dict)
 
@@ -80,7 +80,7 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         self.logger.info('Start global_process matching')
         self.matchor.camera_position_dict = Test_Camera
         result = numpy.empty((2, 2, 2))
-        while self.producer_result_hub.output[E_ProducerOutputName_Global.bInputLoading].b_input_loading.value:
+        while self.producer_result_hub.output[E_ProducerOutputName_Global.bInputLoading].value:
             t1 = time.perf_counter()
             match_times = 0
             for i_camera, each_pass in self.indi_result_queue_dict.items():

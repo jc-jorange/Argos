@@ -74,12 +74,16 @@ class ProducerHub:
             output_value.share_memory_()
 
         elif data_type == E_SharedSaveType.SharedArray_Int:
-            output_value = mp.Array('i', sum(data_shape))
-            output_value[:] = default_value
+            total_size = sum(data_shape)
+            default_value_list = [default_value] * total_size
+            output_value = mp.Array('i', total_size)
+            output_value[:] = default_value_list[:]
 
         elif data_type == E_SharedSaveType.SharedArray_Float:
-            output_value = mp.Array('f', sum(data_shape))
-            output_value[:] = default_value
+            total_size = sum(data_shape)
+            default_value_list = [default_value] * total_size
+            output_value = mp.Array('f', total_size)
+            output_value[:] = default_value_list[:]
 
         elif data_type == E_SharedSaveType.SharedValue_Int:
             output_value = mp.Value('i', default_value)

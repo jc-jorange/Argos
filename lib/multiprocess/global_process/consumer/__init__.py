@@ -9,5 +9,5 @@ class E_Global_Process_Consumer(Enum):
 
 
 factory_global_process_consumer = {
-    E_Global_Process_Consumer.GlobalMatching.name: MultiCameraIdMatchProcess,
+    E_Global_Process_Consumer.MultiCameraIdMatchProcess.name: MultiCameraIdMatchProcess,
 }
