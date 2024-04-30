@@ -7,8 +7,9 @@ from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
 from lib.tracker.utils.utils import mkdir_if_missing
 import lib.postprocess.utils.write_result as wr
-from lib.multiprocess.SharedMemory import ProducerHub, ConsumerOutputPort
+from lib.multiprocess.SharedMemory import DataHub, ConsumerOutputPort
 from lib.multiprocess.SharedMemory import E_SharedSaveType
+
 
 Process_Result_dir = 'result'
 
@@ -26,14 +27,14 @@ class BaseProcess(Process):
     save_dir_type: E_Result_Dir_Type = None
 
     def __init__(self,
-                 producer_result_hub: ProducerHub,
+                 data_hub: DataHub,
                  idx: int,
                  opt: opts,
                  ) -> None:
         super(BaseProcess, self).__init__()
         self.check_save_type(self.save_type)
 
-        self.producer_result_hub = producer_result_hub
+        self.data_hub = data_hub
         self.idx = idx
         self.opt = opt
 

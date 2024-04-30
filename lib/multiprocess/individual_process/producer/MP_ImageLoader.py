@@ -54,10 +54,11 @@ class ImageLoaderProcess(ProducerProcess):
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        hub_image_data = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageData]
-        hub_image_origin_shape = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageOriginShape]
-        hub_frame_id = self.producer_result_hub.output[E_ProducerOutputName_Indi.FrameID]
-        hub_b_loading = self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading]
+        hub_image_data = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.ImageData]
+        hub_image_origin_shape = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.ImageOriginShape]
+        hub_frame_id = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.FrameID]
+
+        hub_b_loading = self.data_hub.bInputLoading[self.idx]
 
         try:
             for path, img, img_0 in self.data_loader:

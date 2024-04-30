@@ -1,12 +1,10 @@
 import time
-import traceback
-from typing import Type
 from collections import defaultdict
 from multiprocessing import queues
 
 from lib.multiprocess import ConsumerProcess
 from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi, E_SharedSaveType
-from lib.predictor import BasePredictor, predictor_factory
+from lib.predictor import predictor_factory
 from lib.postprocess.utils import write_result as wr
 from lib.tracker.utils.utils import *
 
@@ -38,8 +36,11 @@ class PathPredictProcess(ConsumerProcess):
         frame = 0
         subframe = -1
         track_queue = self.last_process_port.output
-        predict_queue = self.output_port.output
-        while self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading].value:
+        predict_queue = self.output_port.producer_data
+
+        hub_b_loading = self.data_hub.bInputLoading[self.idx]
+
+        while hub_b_loading.value:
             t1 = time.perf_counter()
             try:
                 track_result = track_queue.get(block=False)

@@ -5,8 +5,8 @@ from collections import defaultdict
 import numpy
 
 from lib.multiprocess import ConsumerProcess
-from lib.multiprocess.SharedMemory import E_ProducerOutputName_Global, E_ProducerOutputName_Global_PassThrough, E_SharedSaveType
-from lib.multiprocess.SharedMemory import ProducerHub_Global
+from lib.multiprocess.SharedMemory import E_ProducerOutputName_Global, E_SharedSaveType
+from lib.multiprocess.SharedMemory import DataHub, ConsumerOutputPort
 from lib.matchor import BaseMatchor
 from lib.postprocess.utils.write_result import convert_numpy_to_dict
 from lib.postprocess.utils import write_result as wr
@@ -66,12 +66,11 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                  **kwargs):
         super().__init__(output_type, output_shape, *args, **kwargs)
 
-        self.producer_result_hub: ProducerHub_Global
-        self.indi_result_queue_dict = self.producer_result_hub.output_passthrough
+        self.indi_port_dict = self.data_hub.consumer_port
 
         self.match_result_dir_dict = {}
-        for i, queue in self.indi_result_queue_dict.items():
-            self.match_result_dir_dict[i] = self.making_dir(self.results_save_dir, str(i + 1))
+        for i, l in self.indi_port_dict.items():
+            self.match_result_dir_dict[i] = self.making_dir(self.results_save_dir, str(i))
 
         self.matchor = matchor(intrinsic_parameters_dict)
 
@@ -80,15 +79,18 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         self.logger.info('Start global_process matching')
         self.matchor.camera_position_dict = Test_Camera
         result = numpy.empty((2, 2, 2))
-        while self.producer_result_hub.output[E_ProducerOutputName_Global.bInputLoading].value:
+
+        hub_b_loading = self.data_hub.bInputLoading[self.idx]
+
+        while hub_b_loading.value:
             t1 = time.perf_counter()
             match_times = 0
-            for i_camera, each_pass in self.indi_result_queue_dict.items():
-                each_queue = each_pass[E_ProducerOutputName_Global_PassThrough.PredictAll]
+            for i_camera, each_pass in self.indi_port_dict.items():
+                final_result_port: ConsumerOutputPort = each_pass[-1]
                 match_times += 1
                 if i_camera == 0:
                     try:
-                        predict_result = each_queue.get(block=False)
+                        predict_result = final_result_port.read()
                         frame = predict_result[0]
                         subframe = 0
                         result = predict_result[2]
@@ -98,7 +100,7 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                     self.matchor.baseline_camera_position = Test_Camera[0]
                 else:
                     try:
-                        each_result = each_queue.get(block=False)
+                        each_result = final_result_port.read()
                         frame = each_result[0]
                         subframe = each_result[1]
                         each_result = each_result[2]

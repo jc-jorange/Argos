@@ -6,7 +6,7 @@ import json
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
-from lib.multiprocess.SharedMemory import ProducerHub_Indi, ProducerHub_Global
+from lib.multiprocess.SharedMemory import DataHub
 from lib.opts import opts
 from lib.model import load_model, save_model, BaseModel
 from lib.utils.logger import ALL_LoggerContainer
@@ -169,19 +169,18 @@ def track(opt_data):
     container_global_multiprocess = {}
     container_indi_multiprocess_dir = defaultdict(dict)
     container_global_multiprocess_dir = {}
-    container_indi_producer_hub_dict = {}
     indi_last_consumer_dict = {}
 
     sub_processor_num = len(opt_data.input_path)
+
+    data_hub = DataHub(opt_data, sub_processor_num)
+
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
 
     for model_index in range(sub_processor_num):
-        indi_producer_hub = ProducerHub_Indi(opt_data)
-        container_indi_producer_hub_dict[model_index] = indi_producer_hub
-
         for process_type, process_class in factory_indi_process_producer.items():
             main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
-            processor = process_class(indi_producer_hub, model_index, opt_data)
+            processor = process_class(data_hub, model_index, opt_data)
             container_indi_multiprocess[model_index][process_type] = processor
             processor.start()
 
@@ -191,24 +190,23 @@ def track(opt_data):
         for process_type, process_class in factory_indi_process_consumer.items():
             main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
             processor = process_class(
-                producer_result_hub=indi_producer_hub,
+                producer_result_hub=data_hub,
                 idx=model_index,
                 opt=opt_data,
                 last_process_port=last_consumer_port,
             )
             last_consumer_port = processor.output_port
+            data_hub.consumer_port[model_index].append(processor.output_port)
             indi_last_consumer_dict[model_index] = last_consumer_port
             container_indi_multiprocess[model_index][process_type] = processor
             processor.start()
 
             container_indi_multiprocess_dir[model_index][process_type] = processor.main_save_dir
 
-    global_producer_hub = ProducerHub_Global(container_indi_producer_hub_dict, opt_data)
     for process_type, process_class in factory_global_process_producer.items():
         main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
         processor = process_class(
-            container_indi_producer_hub_dict, indi_last_consumer_dict,
-            global_producer_hub, 0, opt_data
+            data_hub, 0, opt_data
         )
         container_global_multiprocess[process_type] = processor
         processor.start()
@@ -219,7 +217,7 @@ def track(opt_data):
     for process_type, process_class in factory_global_process_consumer.items():
         main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
         processor = process_class(
-            producer_result_hub=global_producer_hub,
+            producer_result_hub=data_hub,
             idx=0,
             opt=opt_data,
             last_process_port=last_consumer_port,
@@ -246,14 +244,14 @@ def track(opt_data):
         b_check_tracker = False
         for i, p in container_indi_multiprocess.items():
             b_check_tracker = b_check_tracker or p[E_Indi_Process_Consumer.Tracker.name].is_alive()
-            container_indi_producer_hub_dict[i].output[E_ProducerOutputName_Indi.bInputLoading].value = b_check_tracker
-    global_producer_hub.output[E_ProducerOutputName_Global.bInputLoading].value = False
+            container_indi_producer_hub_dict[i].producer_data[E_ProducerOutputName_Indi.bInputLoading].value = b_check_tracker
+    global_producer_hub.producer_data[E_ProducerOutputName_Global.bInputLoading].value = False
 
     for model_index in range(sub_processor_num):
         for process_type, process_class in factory_indi_process_post.items():
             main_logger.info('-' * 5 + f'Setting {process_type} Post-Processor {model_index}' + '-' * 5)
             processor = process_class(
-                producer_result_hub=container_indi_producer_hub_dict,
+                producer_result_hub=data_hub,
                 process_dir=container_indi_multiprocess_dir,
                 idx=model_index + 1,
                 opt=opt_data
@@ -266,7 +264,7 @@ def track(opt_data):
     for process_type, process_class in factory_global_process_post.items():
         main_logger.info('-' * 5 + f'Setting {process_type} Global-Post-Processor' + '-' * 5)
         processor = process_class(
-            producer_result_hub=global_producer_hub,
+            producer_result_hub=data_hub,
             indi_process_dir=container_indi_multiprocess_dir,
             global_process_dir=container_global_multiprocess_dir,
             idx=0,

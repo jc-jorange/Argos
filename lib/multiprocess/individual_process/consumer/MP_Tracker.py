@@ -60,10 +60,11 @@ class TrackerProcess(ConsumerProcess):
         super(TrackerProcess, self).run_action()
         self.logger.info('Start tracking')
 
-        hub_image_data = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageData]
-        hub_b_loading = self.producer_result_hub.output[E_ProducerOutputName_Indi.bInputLoading]
-        hub_image_origin_shape = self.producer_result_hub.output[E_ProducerOutputName_Indi.ImageOriginShape]
-        hub_frame_id = self.producer_result_hub.output[E_ProducerOutputName_Indi.FrameID]
+        hub_image_data = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.ImageData]
+        hub_image_origin_shape = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.ImageOriginShape]
+        hub_frame_id = self.data_hub.producer_data[self.idx][E_ProducerOutputName_Indi.FrameID]
+
+        hub_b_loading = self.data_hub.bInputLoading[self.idx]
 
         b_track_over = False
         origin_shape = (0, 0, 0)
@@ -118,7 +119,7 @@ class TrackerProcess(ConsumerProcess):
                         self.current_track_result[cls_id, t_id] = xywh
             self.all_frame_results[input_frame_id] = {0: (result_per_subframe, self.fps_loop_avg)}
 
-            self.output_port.output.put((self.frame_id, self.current_track_result))
+            self.output_port.producer_data.put((self.frame_id, self.current_track_result))
 
             # loop timer end record
             self.timer_loop.toc()
@@ -161,8 +162,8 @@ class TrackerProcess(ConsumerProcess):
         self.save_result_to_file(self.results_save_dir, self.all_frame_results)
         del self.all_frame_results
 
-        while self.output_port.output.qsize() > 0:
-            self.output_port.output.get()
+        while self.output_port.producer_data.qsize() > 0:
+            self.output_port.producer_data.get()
 
     def run_end(self) -> None:
         super().run_end()
