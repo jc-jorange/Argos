@@ -1,8 +1,0 @@
-from .producer import E_Global_Process_Producer, factory_global_process_producer
-from .consumer import E_Global_Process_Consumer, factory_global_process_consumer
-from .post import E_Global_Process_Post, factory_global_process_post
-
-factory_global_process_all = {}
-factory_global_process_all.update(factory_global_process_producer)
-factory_global_process_all.update(factory_global_process_consumer)
-factory_global_process_all.update(factory_global_process_post)

@@ -16,8 +16,8 @@ from lib.utils.logger import ALL_LoggerContainer
 from lib.utils.image import gaussian_radius, draw_umich_gaussian
 from lib.utils.utils import xyxy2xywh
 from lib.model.model_config import E_arch_position, E_model_part_input_info
-import lib.multiprocess.SharedMemory as Sh
-from lib.multiprocess.individual_process.producer.MP_ImageLoader import EImageInfo
+import lib.multiprocess_pipeline.SharedMemory as Sh
+from lib.multiprocess_pipeline.process_group.individual_process.producer.MP_ImageLoader import EImageInfo
 
 def letterbox(img,
               height=608,

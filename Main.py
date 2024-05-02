@@ -6,20 +6,20 @@ import json
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
-from lib.multiprocess.SharedMemory import DataHub
+from lib.multiprocess_pipeline.SharedMemory import DataHub
 from lib.opts import opts
 from lib.model import load_model, save_model, BaseModel
 from lib.utils.logger import ALL_LoggerContainer
 from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
-from lib.tracker.utils.utils import mkdir_if_missing
-from lib.multiprocess.individual_process.producer import factory_indi_process_producer
-from lib.multiprocess.individual_process.consumer import factory_indi_process_consumer, E_Indi_Process_Consumer
-from lib.multiprocess.individual_process.post import factory_indi_process_post, E_Indi_Process_Post
-from lib.multiprocess.global_process.producer import factory_global_process_producer
-from lib.multiprocess.global_process.consumer import factory_global_process_consumer
-from lib.multiprocess.global_process.post import factory_global_process_post, E_Global_Process_Post
-from lib.multiprocess.SharedMemory import E_ProducerOutputName_Indi, E_ProducerOutputName_Global
+from lib.multiprocess_pipeline.workers.tracker.utils.utils import mkdir_if_missing
+from lib.multiprocess_pipeline.process_group.individual_process.producer import factory_indi_process_producer
+from lib.multiprocess_pipeline.process_group.individual_process.consumer import factory_indi_process_consumer, E_Indi_Process_Consumer
+from lib.multiprocess_pipeline.process_group.individual_process.post import factory_indi_process_post, E_Indi_Process_Post
+from lib.multiprocess_pipeline.process_group.global_process import factory_global_process_producer
+from lib.multiprocess_pipeline.process_group.global_process.consumer import factory_global_process_consumer
+from lib.multiprocess_pipeline.process_group.global_process import factory_global_process_post
+from lib.multiprocess_pipeline.SharedMemory import E_ProducerOutputName_Indi, E_ProducerOutputName_Global
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 

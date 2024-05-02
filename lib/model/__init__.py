@@ -14,7 +14,7 @@ from lib.utils.logger import ALL_LoggerContainer
 from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture, check_cfg
 from lib.model.model_config import E_arch_position, E_model_general_info, E_model_part_input_info, E_model_part_input_info
 from lib.model.model_config import model_general_info_default_dict
-from .networks.part_config_master import E_part_info
+from .networks.model_part_config import E_model_part_info
 from .networks import backbone_with_neck, backbone, neck, head
 
 
@@ -156,11 +156,11 @@ class BaseModel(nn.Module):
         return output
 
     def builder(self, part_name: str, cfg_model):
-        model_name = cfg_model[part_name][E_part_info(1).name]
+        model_name = cfg_model[part_name][E_model_part_info(1).name]
         model_cfg_path = os.path.join(self.opt.part_path, part_name, model_name, 'cfg')
 
         part_cfg_path = \
-            check_cfg(model_cfg_path, cfg_model[part_name][E_part_info(2).name])
+            check_cfg(model_cfg_path, cfg_model[part_name][E_model_part_info(2).name])
 
         with open(part_cfg_path, 'r') as f:
             arg = yaml.safe_load(f)

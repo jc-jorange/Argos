@@ -1,8 +1,0 @@
-from .producer import E_Indi_Process_Producer, factory_indi_process_producer
-from .consumer import E_Indi_Process_Consumer, factory_indi_process_consumer
-from .post import E_Indi_Process_Post, factory_indi_process_post
-
-factory_indi_process_all = {}
-factory_indi_process_all.update(factory_indi_process_producer)
-factory_indi_process_all.update(factory_indi_process_consumer)
-factory_indi_process_all.update(factory_indi_process_post)

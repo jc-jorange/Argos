@@ -2,12 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import time
 import torch
 from progress.bar import Bar
-import motmetrics as mm
-import torchsummary
 import multiprocessing
 
 from lib.model import BaseModel
@@ -15,8 +12,6 @@ from lib.model.data_parallel import DataParallel
 
 from lib.utils.utils import AverageMeter
 from lib.utils.logger import ALL_LoggerContainer
-
-from lib.tracker.utils.evaluation import Evaluator
 
 
 class ModelWithLoss(torch.nn.Module):

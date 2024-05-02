@@ -1,6 +1,6 @@
 from lib.utils.yacs import CfgNode as CN
-from .networks.part_config_master import part_cfg_master as part_cfg
-from .networks.part_config_master import E_part_info
+from .networks.model_part_config import model_part_cfg_master as part_cfg
+from .networks.model_part_config import E_model_part_info
 from enum import Enum, unique
 import os
 
@@ -25,10 +25,11 @@ class E_model_part_input_info(Enum):
     input_dim = 0
     scale = 1
 
+
 model_general_info_default_dict = {
-    E_model_general_info(0): '',
-    E_model_general_info(1): 1,
-    E_model_general_info(2): 500,
+    E_model_general_info._description: '',
+    E_model_general_info.max_classes_num: 1,
+    E_model_general_info.max_objects_num: 500,
 }
 
 model_arch_dict = {k: part_cfg for k in E_arch_position.__members__}
@@ -48,14 +49,14 @@ def check_model_architecture(cfg: CN):
     for k, v in cfg.items():
         model_name = ''
         if k in E_arch_position.__members__.keys():
-            model_name = v[E_part_info(1).name]
-        if k == E_arch_position(0).name and model_name != '':
+            model_name = v[E_model_part_info(1).name]
+        if k == E_arch_position.head.name and model_name != '':
             bHaveHead = True
-        elif k == E_arch_position(1).name and model_name != '':
+        elif k == E_arch_position.backbone_with_neck.name and model_name != '':
             bHaveBackbone_with_Neck = True
-        elif k == E_arch_position(3).name and model_name != '':
+        elif k == E_arch_position.backbone.name and model_name != '':
             bHaveBackbone = True
-        elif k == E_arch_position(2).name and model_name != '':
+        elif k == E_arch_position.neck.name and model_name != '':
             bHaveNeck = True
 
     arch_list = []  # Order of this list is important
