@@ -6,6 +6,5 @@
 /train.sh
 /eval.sh
 /test.sh
-/funtest.sh
 /val.sh
 /Test.py

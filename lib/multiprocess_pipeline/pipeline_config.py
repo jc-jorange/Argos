@@ -1,4 +1,4 @@
-from lib.utils.yacs import CfgNode as CN
+from yacs.config import CfgNode as CN
 from enum import Enum, unique
 
 

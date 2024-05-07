@@ -1,4 +1,4 @@
-from lib.utils.yacs import CfgNode as CN
+from yacs.config import CfgNode as CN
 from .networks.model_part_config import model_part_cfg_master as part_cfg
 from .networks.model_part_config import E_model_part_info
 from enum import Enum, unique

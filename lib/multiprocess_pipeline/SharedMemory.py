@@ -94,6 +94,7 @@ class DataHub:
 
         self.producer_data = defaultdict(dict)
         self.consumer_port = defaultdict(list)
+        self.all_dir = defaultdict(dict)
 
         self.bInputLoading = defaultdict(mp.Value)
 
@@ -143,4 +144,3 @@ class DataHub:
             raise ValueError(f'Wrong producer output type as {data_type}')
 
         return output_value
-
