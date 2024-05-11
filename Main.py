@@ -3,6 +3,7 @@ import os
 import sys
 from collections import defaultdict
 import json
+from yacs.config import CfgNode as CN
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
@@ -20,6 +21,8 @@ from lib.multiprocess_pipeline.process_group.global_process import factory_globa
 from lib.multiprocess_pipeline.process_group.global_process.consumer import factory_global_process_consumer
 from lib.multiprocess_pipeline.process_group.global_process import factory_global_process_post
 from lib.multiprocess_pipeline.SharedMemory import E_ProducerOutputName_Indi, E_ProducerOutputName_Global
+from lib.multiprocess_pipeline.pipeline_config import E_pipeline_group, E_pipeline_station
+from lib.multiprocess_pipeline.process_group import factory_process_all
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -165,17 +168,13 @@ def track(opt_data):
     for k, v in vars(opt_data).items():
         main_logger.info('  %s: %s' % (str(k), str(v)))
 
-    container_indi_multiprocess = defaultdict(dict)
-    container_global_multiprocess = {}
-    container_indi_multiprocess_dir = defaultdict(dict)
-    container_global_multiprocess_dir = {}
-    indi_last_consumer_dict = {}
-
     sub_processor_num = len(opt_data.input_path)
-
     data_hub = DataHub(opt_data, sub_processor_num)
-
     main_logger.info(f'Total {sub_processor_num} cameras are loaded')
+
+    container_multiprocess = defaultdict(dict)
+    with open(opt_data.process_cfg, 'r') as process_cfg:
+        process_yaml = CN.load_cfg(process_cfg)
 
     for model_index in range(sub_processor_num):
         for process_type, process_class in factory_indi_process_producer.items():

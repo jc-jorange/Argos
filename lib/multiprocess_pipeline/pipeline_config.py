@@ -4,8 +4,8 @@ from enum import Enum, unique
 
 @unique
 class E_pipeline_group(Enum):
-    indis = 0
-    globals = 1
+    globals = 0
+    indis = 1
 
 
 @unique

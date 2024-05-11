@@ -57,16 +57,10 @@ class opts(object):
                                  default='./lib/dataset/cfg/custom.json',
                                  help='load data from cfg')
 
-        self.parser.add_argument('--indi_process_additional',
-                                 nargs='+',
+        self.parser.add_argument('--process_cfg',
                                  type=str,
-                                 default=['Predictor'],
-                                 help='option individual process')
-        self.parser.add_argument('--global_process_additional',
-                                 nargs='+',
-                                 type=str,
-                                 default=['GlobalMatching'],
-                                 help='option global process')
+                                 default='./lib/multiprocess_pipeline/cfg/Predict.yml',
+                                 help='load multi-process structure from cfg')
 
         # system
         self.parser.add_argument('--gpus',

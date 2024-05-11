@@ -1,14 +1,17 @@
 indis:
   producer:
     ImageLoader:
+
   consumer:
     Tracker:
+
     Predictor:
       predictor_name: 'HermiteSpline'
   post:
     IndiPost:
 globals:
   producer:
+
   consumer:
     MultiCameraIdMatchProcess:
       matchor_name: 'CenterRayIntersect'
