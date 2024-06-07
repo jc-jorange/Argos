@@ -88,7 +88,7 @@ _C.TEST = CN()
 
 # size of images for each device
 _C.TEST.BATCH_SIZE_PER_GPU = 32
-# Test Model Epoch
+# Test_old Model Epoch
 _C.TEST.FLIP_TEST = False
 _C.TEST.POST_PROCESS = False
 _C.TEST.SHIFT_HEATMAP = False

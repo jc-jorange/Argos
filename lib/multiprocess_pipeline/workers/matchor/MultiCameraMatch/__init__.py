@@ -14,8 +14,16 @@ class BaseMultiCameraMatchor(BaseMatchor):
         p = np.concatenate((p, np.array([[1]])))  # concatenate [u,v]T to [u,v,1]T
         return k_i @ p
 
-    def convert_predict_to_camera_coord(self, camera_id, predict_result):
-        intrinsic_parameters = self.intrinsic_parameters_dict[camera_id]
+    @staticmethod
+    def get_point_in_world_coord(t: np.ndarray, p: np.ndarray) -> np.ndarray:
+        p[-1] = 1.0
+        t = np.matrix(t)
+        t_i = t.I
+        return t_i @ p
+
+    def convert_predict_to_camera_coord(self, camera_name, predict_result):
+        intrinsic_parameters = self.intrinsic_parameters_dict[camera_name]
+        camera_transform = self.camera_transform_dict[camera_name]
         predict_result_in_camera_coord = np.zeros(
             (predict_result.shape[0], predict_result.shape[1], predict_result.shape[2])  # [class,id,[x,y,z,1]]
         )
@@ -28,11 +36,14 @@ class BaseMultiCameraMatchor(BaseMatchor):
             coord_predict = predict_result[class_predict, id_predict][0:2]
 
             coord_b_in_camera_coord = self.get_point_in_camera_coord(intrinsic_parameters, coord_predict)
-            predict_result_in_camera_coord[class_predict, id_predict] = np.squeeze(coord_b_in_camera_coord.T)
+            coord_b_in_world_coord = self.get_point_in_world_coord(camera_transform, coord_b_in_camera_coord)
+            predict_result_in_camera_coord[class_predict, id_predict] = np.squeeze(coord_b_in_world_coord.T)
             # print(f'idx: {camera_id} ', f'class: {class_predict} ', f'id: {id_predict} ', f'coord: {coord_b_in_camera_coord}')
 
         return predict_result_in_camera_coord
 
     def get_baseline_result(self) -> S_Match_point:
         super().get_baseline_result()
-        return self.convert_predict_to_camera_coord(0, self.baseline_result)
+        baseline_name = list(self.camera_transform_dict.keys())[0]
+        result = self.convert_predict_to_camera_coord(baseline_name, self.baseline_result)
+        return result

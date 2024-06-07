@@ -113,6 +113,7 @@ class BaseModel(nn.Module):
     def __init__(
             self,
             opt,
+            arch: str,
     ):
         super(BaseModel, self).__init__()
         self.logger = ALL_LoggerContainer.logger_dict[os.getpid()]
@@ -120,12 +121,13 @@ class BaseModel(nn.Module):
         self.input_info = {}
 
         self.opt = opt
-        # cfg_path = check_cfg(opt.arch_cfg_path, opt.arch)
-        # self.cfg = model_cfg_master
-        # merge_config(self.cfg, cfg_path)
-        self.cfg = self.opt.model_config
 
-        self.logger.info('model config: {}'.format(opt.arch))
+        cfg_path = check_cfg(self.opt.arch_cfg_path, arch)
+        self.cfg = model_cfg_master
+        merge_config(self.cfg, cfg_path)
+        # self.cfg = self.opt.model_config
+
+        self.logger.info('model config: {}'.format(arch))
 
         self.classes_max_num = self.cfg[E_model_general_info.max_classes_num.name] \
             if self.cfg[E_model_general_info.max_classes_num.name] > model_general_info_default_dict[E_model_general_info.max_classes_num] \

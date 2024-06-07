@@ -1,28 +1,23 @@
 import multiprocessing as mp
 import os
 import sys
-from collections import defaultdict
 import json
+
 from yacs.config import CfgNode as CN
 import torch.utils.data
 from torchvision.transforms import transforms as T
 
-from lib.multiprocess_pipeline.SharedMemory import DataHub
+from lib.multiprocess_pipeline.SharedMemory import SharedDataHub, Struc_SharedData
 from lib.opts import opts
 from lib.model import load_model, save_model, BaseModel
 from lib.utils.logger import ALL_LoggerContainer
 from lib.dataset import TrainingDataset
 from lib.trainer import BaseTrainer
-from lib.multiprocess_pipeline.workers.tracker.utils.utils import mkdir_if_missing
-from lib.multiprocess_pipeline.process_group.individual_process.producer import factory_indi_process_producer
-from lib.multiprocess_pipeline.process_group.individual_process.consumer import factory_indi_process_consumer, E_Indi_Process_Consumer
-from lib.multiprocess_pipeline.process_group.individual_process.post import factory_indi_process_post, E_Indi_Process_Post
-from lib.multiprocess_pipeline.process_group.global_process import factory_global_process_producer
-from lib.multiprocess_pipeline.process_group.global_process.consumer import factory_global_process_consumer
-from lib.multiprocess_pipeline.process_group.global_process import factory_global_process_post
-from lib.multiprocess_pipeline.SharedMemory import E_ProducerOutputName_Indi, E_ProducerOutputName_Global
-from lib.multiprocess_pipeline.pipeline_config import E_pipeline_group, E_pipeline_station
-from lib.multiprocess_pipeline.process_group import factory_process_all
+
+from lib.multiprocess_pipeline.process import ProducerProcess, ConsumerProcess, PostProcess
+from lib.multiprocess_pipeline.process import mkdir_if_missing
+from lib.multiprocess_pipeline.process import E_pipeline_branch
+from lib.multiprocess_pipeline.process import factory_process_all
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -159,128 +154,107 @@ def track(opt_data):
     """
     torch.multiprocessing.set_start_method('spawn')
 
+    # Main save directory
     result_dir = opt_data.save_dir
     mkdir_if_missing(result_dir)
 
+    # Start Tracking
     main_logger.info('-' * 10 + 'Start Tracking' + '-' * 10)
 
+    # Log opt content in this experiment
     main_logger.info("opt:")
     for k, v in vars(opt_data).items():
         main_logger.info('  %s: %s' % (str(k), str(v)))
 
-    sub_processor_num = len(opt_data.input_path)
-    data_hub = DataHub(opt_data, sub_processor_num)
-    main_logger.info(f'Total {sub_processor_num} cameras are loaded')
+    # Read multiprocess pipeline config file
+    with open(opt_data.pipeline_cfg, 'r') as pipeline_cfg:
+        process_yaml = CN.load_cfg(pipeline_cfg)
 
-    container_multiprocess = defaultdict(dict)
-    with open(opt_data.process_cfg, 'r') as process_cfg:
-        process_yaml = CN.load_cfg(process_cfg)
+    # Total indi pipeline
+    sub_processor_num = len(process_yaml.keys())
+    main_logger.info(f'Total {sub_processor_num} pipelines')
 
-    for model_index in range(sub_processor_num):
-        for process_type, process_class in factory_indi_process_producer.items():
-            main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
-            processor = process_class(data_hub, model_index, opt_data)
-            container_indi_multiprocess[model_index][process_type] = processor
-            processor.start()
+    # Initialize multiprocess container for Main process
+    pipeline_tree = {
+        pipeline_name: {
+            branch_name: {}
+            for branch_name, leaf in pipeline_branch.items()
+        } for pipeline_name, pipeline_branch in process_yaml.items()
+    }
 
-            container_indi_multiprocess_dir[model_index][process_type] = processor.main_save_dir
+    # Initialize data hub
+    data_hub = SharedDataHub(opt_data.device, process_yaml)
 
-        last_consumer_port = None
-        for process_type, process_class in factory_indi_process_consumer.items():
-            main_logger.info('-' * 5 + f'Setting {process_type} Sub-Processor {model_index}' + '-' * 5)
-            processor = process_class(
-                producer_result_hub=data_hub,
-                idx=model_index,
-                opt=opt_data,
-                last_process_port=last_consumer_port,
-            )
-            last_consumer_port = processor.output_port
-            data_hub.consumer_port[model_index].append(processor.output_port)
-            indi_last_consumer_dict[model_index] = last_consumer_port
-            container_indi_multiprocess[model_index][process_type] = processor
-            processor.start()
+    for pipeline_name, pipeline_branch in process_yaml.items():
+        for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+            last_consumer_port = None
 
-            container_indi_multiprocess_dir[model_index][process_type] = processor.main_save_dir
+            if pipeline_leaf:
+                for pipeline_leaf_name, pipeline_kwargs in pipeline_leaf.items():
+                    pipeline_kwargs = dict(pipeline_kwargs) if pipeline_kwargs else {}
 
-    for process_type, process_class in factory_global_process_producer.items():
-        main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
-        processor = process_class(
-            data_hub, 0, opt_data
-        )
-        container_global_multiprocess[process_type] = processor
-        processor.start()
+                    if pipeline_branch_name == E_pipeline_branch.producer.name:
+                        pass
+                    elif pipeline_branch_name == E_pipeline_branch.consumer.name:
+                        if last_consumer_port:
+                            pipeline_kwargs.update({'last_process_port': last_consumer_port})
+                    elif pipeline_branch_name == E_pipeline_branch.post.name:
+                        pass
+                    elif pipeline_branch_name == E_pipeline_branch.static_shared_value.name:
+                        data_hub.dict_shared_data[pipeline_name].update(
+                            {pipeline_leaf_name: Struc_SharedData(opt_data.device, tuple(pipeline_kwargs.values()))}
+                        )
+                        continue
 
-        container_global_multiprocess_dir[process_type] = processor.main_save_dir
+                    main_logger.info('-' * 5 + 'Setting ' 
+                                               f'Pipeline: {pipeline_name}, '
+                                               f'Sub-Processor: {pipeline_leaf_name} @ {pipeline_branch_name} '
+                                     + '-' * 5)
 
-    last_consumer_port = None
-    for process_type, process_class in factory_global_process_consumer.items():
-        main_logger.info('-' * 5 + f'Setting {process_type} Global-Processor' + '-' * 5)
-        processor = process_class(
-            producer_result_hub=data_hub,
-            idx=0,
-            opt=opt_data,
-            last_process_port=last_consumer_port,
-        )
-        last_consumer_port = processor.output_port
-        container_global_multiprocess[process_type] = processor
-        processor.start()
+                    processor = factory_process_all[pipeline_branch_name][pipeline_leaf_name](
+                        data_hub=data_hub,
+                        pipeline_name=pipeline_name,
+                        opt=opt_data,
+                        **pipeline_kwargs,
+                    )
 
-        container_global_multiprocess_dir[process_type] = processor.main_save_dir
+                    processor.start()
 
-    for model_index, each_index_process in container_indi_multiprocess.items():
-        for process_type, process_class in each_index_process.items():
-            process_ = process_class
-            main_logger.info('-' * 5 + f'Start {process_class} Sub-Process No.{model_index}' + '-' * 5)
-            process_.process_run_action()
+                    if pipeline_branch_name == E_pipeline_branch.producer.name:
+                        processor: ProducerProcess
+                        pass
+                    elif pipeline_branch_name == E_pipeline_branch.consumer.name:
+                        processor: ConsumerProcess
+                        last_consumer_port = processor.output_port
+                        data_hub.dict_consumer_port[pipeline_name].append(last_consumer_port)
+                    elif pipeline_branch_name == E_pipeline_branch.post.name:
+                        processor: PostProcess
+                        pass
 
-    for process_type, process_class in container_global_multiprocess.items():
-        process_ = process_class
-        main_logger.info('-' * 5 + f'Start {process_class} Global-Process ' + '-' * 5)
-        process_.process_run_action()
+                    pipeline_tree[pipeline_name][pipeline_branch_name][pipeline_leaf_name] = processor
+                    data_hub.dict_process_results_dir[pipeline_name][pipeline_branch_name][pipeline_leaf_name] \
+                        = processor.results_save_dir
 
-    b_check_tracker = True
-    while b_check_tracker:
-        b_check_tracker = False
-        for i, p in container_indi_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[E_Indi_Process_Consumer.Tracker.name].is_alive()
-            container_indi_producer_hub_dict[i].producer_data[E_ProducerOutputName_Indi.bInputLoading].value = b_check_tracker
-    global_producer_hub.producer_data[E_ProducerOutputName_Global.bInputLoading].value = False
+    for pipeline_name, pipeline_branch in pipeline_tree.items():
+        for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+            for pipeline_leaf_name, process in pipeline_leaf.items():
+                main_logger.info('-' * 5 + 'Starting '
+                                           f'Pipeline: {pipeline_name}, '
+                                           f'Sub-Processor: {pipeline_leaf_name} @ {pipeline_branch_name} '
+                                 + '-' * 5)
+                process.process_run_action()
 
-    for model_index in range(sub_processor_num):
-        for process_type, process_class in factory_indi_process_post.items():
-            main_logger.info('-' * 5 + f'Setting {process_type} Post-Processor {model_index}' + '-' * 5)
-            processor = process_class(
-                producer_result_hub=data_hub,
-                process_dir=container_indi_multiprocess_dir,
-                idx=model_index + 1,
-                opt=opt_data
-            )
-            container_indi_multiprocess[model_index][process_type] = processor
-            processor.start()
-            processor.process_run_action()
-
-    global_post = None
-    for process_type, process_class in factory_global_process_post.items():
-        main_logger.info('-' * 5 + f'Setting {process_type} Global-Post-Processor' + '-' * 5)
-        processor = process_class(
-            producer_result_hub=data_hub,
-            indi_process_dir=container_indi_multiprocess_dir,
-            global_process_dir=container_global_multiprocess_dir,
-            idx=0,
-            opt=opt_data)
-        # container_multiprocess[sub_processor_num + 1][process_type] = processor
-        global_post = processor
-        processor.start()
-        processor.process_run_action()
-
-    b_check_tracker = True
-    while b_check_tracker:
-        b_check_tracker = False
-        for i, p in container_indi_multiprocess.items():
-            b_check_tracker = b_check_tracker or p[E_Indi_Process_Post.IndiPost.name].is_alive()
-
-    while global_post.is_alive():
-        pass
+    b_check_sub = True
+    while b_check_sub:
+        b_check_sub = False
+        b_check_producer = False
+        for pipeline_name, pipeline_branch in pipeline_tree.items():
+            for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+                for pipeline_leaf_name, process in pipeline_leaf.items():
+                    b_check_sub = b_check_sub or process.is_alive()
+                    if pipeline_branch_name == E_pipeline_branch.producer.name:
+                        b_check_producer = b_check_producer or process.is_alive()
+                data_hub.dict_bLoadingFlag[pipeline_name].value = b_check_producer
 
     main_logger.info('-' * 10 + 'Main Finished' + '-' * 10)
 

@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, defaultdict
 
 from lib.utils.logger import ALL_LoggerContainer
 from lib.model import BaseModel, load_model
@@ -29,7 +29,7 @@ class MCTrack(MCBaseTrack):
         self.cls_id = cls_id
 
         # wait activate
-        self._tlwh = np.asarray(tlwh, dtype=np.float)
+        self._tlwh = np.asarray(tlwh, dtype=np.float64)
         self.kalman_filter = None
         self.mean, self.covariance = None, None
         self.is_activated = False
@@ -255,14 +255,22 @@ def map2orig(dets, h_out, w_out, h_orig, w_orig, num_classes):
 
 
 class MCJDETracker(object):
-    def __init__(self, opt, frame_rate=30):
+    def __init__(self,
+                 opt,
+                 arch: str,
+                 model_weight: str,
+                 conf_thres: float,
+                 track_buffer: int,
+                 frame_rate=30):
         self.opt = opt
+
+        self.conf_thres = conf_thres
 
         # ----- init model
         ALL_LoggerContainer.logger_dict[os.getpid()].info('Creating model...')
-        self.model = BaseModel(opt)
+        self.model = BaseModel(opt, arch)
         self.info_data = self.model.info_data
-        self.model = load_model(self.model, opt.load_model)  # load specified checkpoint
+        self.model = load_model(self.model, model_weight)  # load specified checkpoint
         self.model = self.model.to(opt.device)
         self.model.eval()
 
@@ -272,12 +280,12 @@ class MCJDETracker(object):
         self.removed_tracks_dict = defaultdict(list)  # value type: list[STrack]
 
         self.frame_id = 0
-        self.det_thresh = opt.conf_thres
-        self.buffer_size = int(frame_rate / 30.0 * opt.track_buffer)
+        self.det_thresh = conf_thres
+        self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size
         self.max_per_image = self.model.objects_max_num  # max objects per image
-        self.mean = np.array(self.info_data.mean, dtype=np.float32).reshape(1, 1, 3)
-        self.std = np.array(self.info_data.std, dtype=np.float32).reshape(1, 1, 3)
+        self.mean = np.array(self.info_data.mean, dtype=np.float64).reshape(1, 1, 3)
+        self.std = np.array(self.info_data.std, dtype=np.float64).reshape(1, 1, 3)
 
         # ----- using kalman filter to stabilize tracking
         self.kalman_filter = KalmanFilter()
@@ -317,7 +325,7 @@ class MCJDETracker(object):
         # dets = dets[0]  # fetch the first image dets results(batch_size = 1 by default)
 
         for j in range(self.model.classes_max_num):
-            dets[0][j] = np.array(dets[0][j], dtype=np.float32).reshape(-1, 6)
+            dets[0][j] = np.array(dets[0][j], dtype=np.float64).reshape(-1, 6)
 
         return dets[0]
 
@@ -329,7 +337,7 @@ class MCJDETracker(object):
         results = {}
         for j in range(self.model.classes_max_num):
             results[j] = np.concatenate([detection[j] for detection in detections],
-                                        axis=0).astype(np.float32)
+                                        axis=0).astype(np.float64)
 
         scores = np.hstack([results[j][:, 4] for j in range(self.model.classes_max_num)])
         if len(scores) > self.max_per_image:
@@ -351,7 +359,7 @@ class MCJDETracker(object):
         height, width = img_0.shape[0], img_0.shape[1]  # H, W of original input image
         net_height, net_width = im_blob.shape[2], im_blob.shape[3]  # H, W of net input
 
-        c = np.array([width * 0.5, height * 0.5], dtype=np.float32)  # image center
+        c = np.array([width * 0.5, height * 0.5], dtype=np.float64)  # image center
         s = max(float(net_width) / float(net_height) * height, width) * 1.0
 
         h_out = net_height // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][0]
@@ -385,7 +393,7 @@ class MCJDETracker(object):
                 cls_dets = dets[cls_id]
 
                 # filter out low conf score dets
-                remain_inds = cls_dets[:, 4] > self.opt.conf_thres
+                remain_inds = cls_dets[:, 4] > self.conf_thres
                 cls_dets = cls_dets[remain_inds]
                 dets_dict[cls_id] = cls_dets
 
@@ -415,7 +423,7 @@ class MCJDETracker(object):
         height, width, channels = origin_shape  # H, W of original input image
         net_height, net_width = im_blob.shape[2], im_blob.shape[3]  # H, W of net input
 
-        c = np.array([width * 0.5, height * 0.5], dtype=np.float32)
+        c = np.array([width * 0.5, height * 0.5], dtype=np.float64)
         s = max(float(net_width) / float(net_height) * height, width) * 1.0
         h_out = net_height // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
         w_out = net_width // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
@@ -466,7 +474,7 @@ class MCJDETracker(object):
             cls_dets = dets[cls_id]
 
             # filter out low confidence detections
-            remain_inds = cls_dets[:, 4] > self.opt.conf_thres
+            remain_inds = cls_dets[:, 4] > self.conf_thres
             cls_dets = cls_dets[remain_inds]
             cls_id_feature = cls_id_feats[cls_id][remain_inds]
 

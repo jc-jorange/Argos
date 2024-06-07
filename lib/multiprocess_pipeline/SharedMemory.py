@@ -1,9 +1,10 @@
 import multiprocessing as mp
 from enum import Enum, unique
-from collections import defaultdict
+from yacs.config import CfgNode as CN
 import numpy as np
 import torch
-
+import math
+from collections import Iterable
 
 @unique
 class E_SharedSaveType(Enum):
@@ -15,32 +16,10 @@ class E_SharedSaveType(Enum):
     SharedValue_Float = 6
 
 
-@unique
-class E_ProducerOutputName_Indi(Enum):
-    FrameID = 1
-    ImageOriginShape = 2
-    ImageData = 3
-    CameraTransform = 4
+format_SharedDataInfo = (E_SharedSaveType, tuple, int)
 
 
-@unique
-class E_ProducerOutputName_Global(Enum):
-    bInputLoading = 1
-
-
-format_ProducerOutput = (E_SharedSaveType, tuple, int)
-dict_ProducerOutput_Indi = {
-    E_ProducerOutputName_Indi.FrameID: (E_SharedSaveType.SharedValue_Int, (1,), 0),
-    E_ProducerOutputName_Indi.ImageOriginShape: (E_SharedSaveType.SharedArray_Int, (3,), 0),
-    E_ProducerOutputName_Indi.ImageData: (E_SharedSaveType.Queue, (1,), 0),
-    E_ProducerOutputName_Indi.CameraTransform: (E_SharedSaveType.SharedArray_Float, (4, 4), 0),
-}
-
-dict_ProducerOutput_Global = {
-}
-
-
-class ConsumerOutputPort:
+class Struc_ConsumerOutputPort:
     def __init__(self,
                  opt,
                  output_type: E_SharedSaveType,
@@ -86,61 +65,172 @@ class ConsumerOutputPort:
         return result
 
 
-class DataHub:
-    def __init__(self,
-                 indi_process_amount: int,
-                 opt):
-        self.opt = opt
+class Struc_SharedData:
+    _data = None
+    data_type = None
+    data_shape = ()
+    device = 'cpu'
 
-        self.producer_data = defaultdict(dict)
-        self.consumer_port = defaultdict(list)
-        self.all_dir = defaultdict(dict)
-
-        self.bInputLoading = defaultdict(mp.Value)
-
-        if self.opt.realtime:
-            dict_ProducerOutput_Indi[E_ProducerOutputName_Indi.ImageData] = \
-                (E_SharedSaveType.Tensor, self.opt.net_input_shape, 0)
-
-        for k, v in dict_ProducerOutput_Global.items():
-            self.producer_data[0][k] = self.generate_output_value(v)
-
-        for idx_indi in range(indi_process_amount):
-            for k, v in dict_ProducerOutput_Indi.items():
-                self.producer_data[idx_indi + 1][k] = self.generate_output_value(v)
-
-    def generate_output_value(self, output_format: format_ProducerOutput) -> any:
-        data_type: E_SharedSaveType = output_format[0]
-        data_shape: tuple = output_format[1]
-        default_value: int = output_format[2]
+    def _generate_output_value(self, output_format: format_SharedDataInfo) -> any:
+        data_type = output_format[0]
+        data_type = data_type if isinstance(data_type, E_SharedSaveType) else E_SharedSaveType[data_type]
+        self.data_type = data_type
+        data_shape = output_format[1]
+        self.data_shape = tuple(data_shape)
+        default_value = output_format[2]
 
         if data_type == E_SharedSaveType.Queue:
             output_value = mp.Queue()
+            if default_value:
+                output_value.put(default_value)
 
         elif data_type == E_SharedSaveType.Tensor:
-            if default_value:
-                output_value = torch.ones(data_shape, dtype=torch.float, device=self.opt.device)
+            if isinstance(default_value, Iterable):
+                default_value = np.asarray(default_value)
+                output_value = torch.from_numpy(default_value)
+                output_value = output_value.type(torch.float)
+                output_value = output_value.to(self.device)
             else:
-                output_value = torch.empty(data_shape, dtype=torch.float, device=self.opt.device)
-            output_value.share_memory_()
+                if default_value:
+                    output_value = torch.ones(data_shape, dtype=torch.float, device=self.device)
+                    output_value = output_value * default_value
+                else:
+                    output_value = torch.empty(data_shape, dtype=torch.float, device=self.device)
+                output_value.share_memory_()
 
         elif data_type == E_SharedSaveType.SharedArray_Int:
-            total_size = sum(data_shape)
-            default_value_list = [default_value] * total_size
+            total_size = math.prod(data_shape)
+            if isinstance(default_value, Iterable):
+                default_value_list = np.asarray(default_value)
+                default_value_list = default_value_list.flatten()
+            else:
+                default_value_list = [default_value] * total_size
             output_value = mp.Array('i', total_size)
             output_value[:] = default_value_list[:]
         elif data_type == E_SharedSaveType.SharedArray_Float:
-            total_size = sum(data_shape)
-            default_value_list = [default_value] * total_size
+            total_size = math.prod(data_shape)
+            if isinstance(default_value, Iterable):
+                default_value_list = np.asarray(default_value)
+                default_value_list = default_value_list.flatten()
+            else:
+                default_value_list = [default_value] * total_size
             output_value = mp.Array('f', total_size)
             output_value[:] = default_value_list[:]
 
         elif data_type == E_SharedSaveType.SharedValue_Int:
+            assert not isinstance(default_value, Iterable), f'iterable default value apply to single value'
             output_value = mp.Value('i', default_value)
         elif data_type == E_SharedSaveType.SharedValue_Float:
+            assert not isinstance(default_value, Iterable), f'iterable default value apply to single value'
             output_value = mp.Value('f', default_value)
 
         else:
             raise ValueError(f'Wrong producer output type as {data_type}')
 
         return output_value
+
+    def __init__(self,
+                 device: str,
+                 output_format: format_SharedDataInfo):
+        self.device = device
+        self._data = self._generate_output_value(output_format)
+
+    def set(self, data_set):
+        data = self._data
+        data_type = self.data_type
+
+        if data_type == E_SharedSaveType.Queue:
+            data.put(data_set)
+
+        elif data_type == E_SharedSaveType.Tensor:
+            data[:] = data_set[:]
+
+        elif data_type == E_SharedSaveType.SharedArray_Int or \
+                data_type == E_SharedSaveType.SharedArray_Float:
+            data_set = np.asarray(data_set)
+            data_set = data_set.flatten()
+            data[:] = data_set[:]
+
+        elif data_type == E_SharedSaveType.SharedValue_Int or \
+                data_type == E_SharedSaveType.SharedValue_Float:
+            data.value = data_set
+
+    def get(self):
+        data_type = self.data_type
+        data = self._data
+
+        if data_type == E_SharedSaveType.Queue:
+            if data.empty():
+                return None
+            else:
+                return data.get(block=False)
+
+        elif data_type == E_SharedSaveType.Tensor:
+            return data
+
+        elif data_type == E_SharedSaveType.SharedArray_Int or \
+                data_type == E_SharedSaveType.SharedArray_Float:
+            data = data[:]
+            data = np.asarray(data)
+            data = data.reshape(self.data_shape)
+            return data
+
+        elif data_type == E_SharedSaveType.SharedValue_Int or \
+                data_type == E_SharedSaveType.SharedValue_Float:
+            return data.value
+
+    def clear(self):
+        data_type = self.data_type
+        data = self._data
+
+        if data_type == E_SharedSaveType.Queue:
+            with data.mutex:
+                data.queue.clear()
+
+    def size(self):
+        data_type = self.data_type
+        data = self._data
+
+        if data_type == E_SharedSaveType.Queue:
+            return [data.qsize()]
+        else:
+            return list(self.data_shape)
+
+
+from .process import factory_process_all
+
+
+class SharedDataHub:
+    def __init__(self,
+                 device: str,
+                 pipeline_cfg: CN):
+
+        self.dict_shared_data = {}
+        for pipeline_name, pipeline_branch in pipeline_cfg.items():
+            tmp_shared_data_dict = {}
+            for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+                if pipeline_leaf and (pipeline_branch_name in factory_process_all.keys()):
+                    for pipeline_leaf_name in pipeline_leaf.keys():
+                        for shared_data_name, shared_data_info in factory_process_all[pipeline_branch_name] \
+                                [pipeline_leaf_name].shared_data.items():
+                            tmp_shared_data_dict.update({shared_data_name: Struc_SharedData(device, shared_data_info)})
+            self.dict_shared_data.update({pipeline_name: tmp_shared_data_dict})
+
+        self.dict_consumer_port = {
+            pipeline_name: [] for pipeline_name, pipeline_branch in pipeline_cfg.items()
+        }
+
+        self.dict_process_results_dir = {}
+        for pipeline_name, pipeline_branch in pipeline_cfg.items():
+            tmp_dict_branch = {}
+            for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+                tmp_dict_leaf = {}
+                if pipeline_leaf:
+                    for pipeline_leaf_name in pipeline_leaf.keys():
+                        tmp_dict_leaf[pipeline_leaf_name] = ''
+                tmp_dict_branch.update({pipeline_branch_name: tmp_dict_leaf})
+            self.dict_process_results_dir.update({pipeline_name: tmp_dict_branch})
+
+        self.dict_bLoadingFlag = {
+            pipeline_name: mp.Value('b', 1) for pipeline_name in pipeline_cfg.keys()
+        }

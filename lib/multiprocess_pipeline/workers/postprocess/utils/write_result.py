@@ -7,6 +7,7 @@ from collections import defaultdict
 # {frame: {subframe: ({class: {ID: ((tlwh), score)}}, fps)}}
 S_default_save = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
 
+
 @unique
 class E_text_result_type(Enum):
     raw = 1
@@ -26,6 +27,7 @@ Dict_text_result_format = {
     E_text_result_type.kitti: '{frame} {id} pedestrian 0 0 -10 {x1} {y1} {x2} {y2} -10 -10 -10 -1000 -1000 -1000 -10\n',
 }
 
+Str_image_result_dir_name = 'frames'
 Str_video_result_name = 'video_result.mp4'
 
 
@@ -132,7 +134,7 @@ def plot_tracks(
                             color=color,
                             thickness=line_thickness,
                         )
-                    except KeyError or IndexError:
+                    except (KeyError, IndexError):
                         cv2.circle(
                             img=img,
                             center=int_box[0:2],
@@ -220,7 +222,6 @@ def write_results_to_text(
 
 def write_results_to_video(result_root, frame_dir, video_type, frame_rate):
     output_video_path = os.path.join(result_root, Str_video_result_name)
-    a = os.listdir(frame_dir)
     ini_img_dir = os.path.join(frame_dir, os.listdir(frame_dir)[0])
     ini_img = cv2.imread(ini_img_dir)
     res = (ini_img.shape[1], ini_img.shape[0])
@@ -230,6 +231,8 @@ def write_results_to_video(result_root, frame_dir, video_type, frame_rate):
     for each_img in img_list:
         if each_img.endswith('.jpg'):
             img_dir = os.path.join(frame_dir, each_img)
+
             img = cv2.imread(img_dir)
             video.write(img)
+
     video.release()

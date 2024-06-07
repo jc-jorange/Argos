@@ -1,0 +1,88 @@
+FuncTest_1:
+  producer:
+    ImageLoader:
+      image_path: "UDP:127.0.0.1:6000"
+      loader: Address
+      normalized_image_shape: [ 3, 608, 1088 ]
+
+  consumer:
+    Track:
+      arch: DLA+GhostPAN_mot_8class
+      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+      conf_thres: 0.4
+      track_buffer: 30
+
+  post:
+    IndiResultsVisual:
+      output_format: video
+
+  static_shared_value:
+    CamIntrinsicPara:
+      type: SharedArray_Float
+      shape: [ 3, 4 ]
+      value: [ [ 11.11, 0., 128.0, 0 ],
+               [ 0, 11.11, 128.0, 0 ],
+               [ 0, 0, 1.0000, 0 ] ]
+
+FuncTest_2:
+  producer:
+    ImageLoader:
+      image_path: "UDP:127.0.0.1:6001"
+      loader: Address
+      normalized_image_shape: [ 3, 608, 1088 ]
+
+  consumer:
+    Track:
+      arch: DLA+GhostPAN_mot_8class
+      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+      conf_thres: 0.4
+      track_buffer: 30
+
+  post:
+    IndiResultsVisual:
+      output_format: video
+
+  static_shared_value:
+    CamIntrinsicPara:
+      type: SharedArray_Float
+      shape: [ 3, 4 ]
+      value: [ [ 11.11, 0., 128.0, 0 ],
+               [ 0, 11.11, 128.0, 0 ],
+               [ 0, 0, 1.0000, 0 ] ]
+
+#FuncTest_3:
+#  producer:
+#    ImageLoader:
+#      image_path: "UDP:127.0.0.1:6002"
+#      loader: Address
+#      normalized_image_shape: [ 3, 608, 1088 ]
+#
+#  consumer:
+#    Track:
+#      arch: DLA+GhostPAN_mot_8class
+#      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+#      conf_thres: 0.4
+#      track_buffer: 30
+#
+#  post:
+#
+#  static_shared_value:
+
+FuncTest_Global:
+  producer:
+    CameraTransLoader:
+      loader: Address_All
+      source: 'UDP:127.0.0.1:7000'
+      name_list:
+        - FuncTest_1
+        - FuncTest_2
+
+  consumer:
+    MultiCameraIdMatch:
+      matchor_name: CenterRayIntersect
+
+  post:
+    GlobalResultsVisual:
+      output_format: video
+
+  static_shared_value:

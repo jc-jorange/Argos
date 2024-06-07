@@ -22,13 +22,19 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
     def get_ray_position(p: np.ndarray, d: np.ndarray, t: float) -> np.ndarray:
         return p + (t * d)
 
-    def match_content(self, idx: int, predict_result: S_Match_point) -> S_Match_point:
-        predict_result_in_camera_coord = self.convert_predict_to_camera_coord(idx, predict_result)
+    def match_content(self, name, predict_result: S_Match_point) -> S_Match_point:
+        predict_result_in_camera_coord = self.convert_predict_to_camera_coord(name, predict_result)
         classandid_predict_result = np.nonzero(predict_result)
         classandid_baseline = np.nonzero(self.baseline_result)
 
-        camera_position_baseline = np.squeeze(self.baseline_camera_position.T)[0:3]
-        camera_position_predict = np.squeeze(self.camera_position_dict[idx].T)[0:3]
+        camera_position_baseline = np.squeeze(self.baseline_camera_transform.T)[0:3]
+        camera_position_predict = np.squeeze(self.camera_transform_dict[name].T)[0:3]
+
+        camera_transform_baseline = self.baseline_camera_transform
+        camera_transform_predict = self.camera_transform_dict[name]
+
+        camera_position_baseline = camera_transform_baseline[:, 3][0:3]
+        camera_position_predict = camera_transform_predict[:, 3][0:3]
 
         matched_baseline_classandid = {}
         for i_predict in range(len(classandid_predict_result[0]) // 4):
@@ -54,7 +60,7 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
                 p2 = self.get_ray_position(camera_position_predict, coord_predict, t2)
 
                 distance = np.linalg.norm(p2 - p1)
-                print(f'idx: {idx} ', f'class: {class_predict} ', f'id: {id_predict} ',
+                print(f'idx: {name} ', f'class: {class_predict} ', f'id: {id_predict} ',
                       f'base class: {class_base}', f'base id: {id_base}', f'distance: {distance}',
                       f'p1: {p1}', f'p2: {p2}', f't1: {t1}', f't2: {t2}')
                 if distance < self.max_distance and 0 < t1 < self.max_range and 0 < t2 < self.max_range:
