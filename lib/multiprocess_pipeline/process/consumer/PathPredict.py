@@ -45,7 +45,7 @@ class PathPredictProcess(ConsumerProcess):
             try:
                 track_result = track_queue.get(block=False)
                 frame = track_result[0]
-                self.current_track_result = track_result[1]
+                self.current_track_result = track_result[-1]
 
                 self.save_result_to_file(self.results_save_dir, self.all_predict_result)
                 # del self.all_predict_result

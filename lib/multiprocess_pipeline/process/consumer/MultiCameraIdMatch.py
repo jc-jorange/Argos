@@ -132,7 +132,7 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                         except multiprocessing.queues.Empty:
                             break
 
-                        if timestamp_image:
+                        if isinstance(result, numpy.ndarray) and timestamp_image:
                             self.matchor.baseline_camera_transform = \
                                 self.compare_timestamp_get_transform(pipeline_name, timestamp_image)
                             self.matchor.camera_transform_dict[pipeline_name] = self.matchor.baseline_camera_transform

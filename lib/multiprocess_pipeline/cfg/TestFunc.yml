@@ -12,6 +12,9 @@ FuncTest_1:
       conf_thres: 0.4
       track_buffer: 30
 
+    PathPredict:
+      predictor_name: HermiteSpline
+
   post:
     IndiResultsVisual:
       output_format: video
@@ -37,6 +40,9 @@ FuncTest_2:
       load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
       conf_thres: 0.4
       track_buffer: 30
+
+    PathPredict:
+      predictor_name: HermiteSpline
 
   post:
     IndiResultsVisual:

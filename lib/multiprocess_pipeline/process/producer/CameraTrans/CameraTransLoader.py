@@ -73,12 +73,12 @@ class CameraTransLoaderProcess(CameraTransProcess_Master):
                 self.dps_avg = self.count / delta_time_all
                 self.dps_cur = 1 / delta_time_each
 
-                if self.count % 10 == 0 and self.count != 0:
-                    self.logger.info(
-                        f'Processing frame {self.count}: '
-                        f'average dps: {self.dps_avg:.2f}, '
-                        f'current dps: {self.dps_cur:.2f}; '
-                    )
+                # if self.count % 10 == 0 and self.count != 0:
+                #     self.logger.info(
+                #         f'Processing frame {self.count}: '
+                #         f'average dps: {self.dps_avg:.2f}, '
+                #         f'current dps: {self.dps_cur:.2f}; '
+                #     )
 
                 each_frame_start_time = time.perf_counter()
 
@@ -87,7 +87,7 @@ class CameraTransLoaderProcess(CameraTransProcess_Master):
 
     def run_end(self) -> None:
         self.logger.info(
-            f"Total receive {self.loader.count} frames in {self.load_time} s"
+            f"Total receive {self.loader.count} transform data in {self.load_time} s"
         )
 
         hub_camera_trans = \
