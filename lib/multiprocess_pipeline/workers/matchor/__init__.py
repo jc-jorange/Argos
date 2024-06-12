@@ -8,7 +8,7 @@ class BaseMatchor:
     def __init__(self,
                  intrinsic_parameters_dict,
                  max_range=10000,
-                 max_distance=1):
+                 threshold=1):
         super().__init__()
 
         # intrinsic_parameters_dict = {camera_key: Intrinsic Parameters Numpy Matrix}
@@ -23,7 +23,7 @@ class BaseMatchor:
         self.match_result = None
 
         self.max_range = max_range
-        self.max_distance = max_distance
+        self.threshold = threshold
 
     def get_baseline_result(self) -> S_Match_point:
         ...

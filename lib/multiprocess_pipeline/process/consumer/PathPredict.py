@@ -3,7 +3,7 @@ from multiprocessing import queues
 from collections import defaultdict
 
 from lib.multiprocess_pipeline.process import ConsumerProcess
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType
 from lib.multiprocess_pipeline.workers.predictor import factory_predictor
 from lib.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
 from lib.multiprocess_pipeline.workers.tracker.utils.utils import *
@@ -16,6 +16,7 @@ class PathPredictProcess(ConsumerProcess):
     save_type = [wr.E_text_result_type.raw]
 
     output_type = E_SharedSaveType.Queue
+    output_data_type = E_OutputPortDataType.CameraTrack
     output_shape = (1,)
 
     def __init__(self,
@@ -23,46 +24,85 @@ class PathPredictProcess(ConsumerProcess):
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        if self.last_process_port.data_type != E_OutputPortDataType.CameraTrack:
+            raise TypeError('Connect last consumer process output data type not fit')
+
         self.current_track_result = None
         self.current_predict_result = None
         self.all_predict_result = {}
+        self.predictor_name = predictor_name
+        self.predictor = None
 
-        self.predictor = factory_predictor[predictor_name]()
+    def run_begin(self) -> None:
+        super(PathPredictProcess, self).run_begin()
+
+        self.logger.info(f'Creating predictor {self.predictor_name}')
+        self.predictor = factory_predictor[self.predictor_name]()
 
     def run_action(self) -> None:
-        self.logger.info('Start predicting')
         super(PathPredictProcess, self).run_action()
+        self.logger.info('Start predicting')
+
         self.predictor.time_0 = time.perf_counter()
+        frame_get = 0
         frame = 0
-        subframe = -1
-        track_queue = self.last_process_port.output
-        predict_queue = self.output_port.output
+        subframe = 0
+
+        t_frame_start = time.perf_counter()
 
         hub_b_loading = self.data_hub.dict_bLoadingFlag[self.pipeline_name]
 
         while hub_b_loading.value:
-            t1 = time.perf_counter()
+            b_get_new_data = True
+            t_subframe_start = time.perf_counter()
             try:
-                track_result = track_queue.get(block=False)
-                frame = track_result[0]
+                track_result = self.last_process_port.read()
+                frame_get = track_result[0]
                 self.current_track_result = track_result[-1]
+                self.logger.debug(f'Get track result @ frame {frame}')
+                b_get_new_data = frame != frame_get
+            except queues.Empty:
+                b_get_new_data = False
+
+            if b_get_new_data:
+                t_frame_end = time.perf_counter()
+                frame_time = t_frame_end - t_frame_start
+                frame = frame_get
+
+                if frame and subframe and frame % 10 == 0:
+                    self.logger.info(f'Predict {subframe} subframe In frame {frame} '
+                                     f'by {frame_time} s ({1 / frame_time} fps)')
 
                 self.save_result_to_file(self.results_save_dir, self.all_predict_result)
-                # del self.all_predict_result
-                self.all_predict_result = {}
+                self.logger.debug(f'Save last frame results to file')
 
-                # frame += 1
+                self.all_predict_result = {frame: {}}
                 subframe = 0
+                frame_time = 0
+
+                t_frame_start = time.perf_counter()
+
                 self.current_predict_result = self.predictor.set_new_base(self.current_track_result)
-                self.all_predict_result[frame] = {}
-            except queues.Empty:
-                subframe += 1
-                self.current_predict_result = self.predictor.get_predicted_position(time.perf_counter())
+                self.logger.debug(f'Set Predict base and set base as predict result')
+
+            else:
+                self.logger.debug(f'Start subframe predict @ frame {frame}')
+                subframe_start_time = time.perf_counter()
+
+                self.current_predict_result = self.predictor.get_predicted_position(subframe_start_time)
                 if isinstance(self.current_predict_result, torch.Tensor):
                     self.current_predict_result = self.current_predict_result.numpy()
+                subframe += 1
 
-            if not predict_queue.qsize() > 8:
-                predict_queue.put((frame, subframe, self.current_predict_result))
+                subframe_time_end = time.perf_counter()
+                delta_t_predict = subframe_time_end - subframe_start_time
+                self.logger.debug(f'Predicted @ frame {frame} - subframe {subframe} by {delta_t_predict} s')
+
+            if self.output_port.size() < self.output_buffer:
+                self.output_port.send((frame, subframe, self.current_predict_result))
+                self.logger.debug(f'Send predict results to next')
+            else:
+                self.logger.debug(f'Output port over {self.output_buffer} buffer size')
 
             if isinstance(self.current_predict_result, np.ndarray):
                 result_each_subframe = {}
@@ -80,18 +120,14 @@ class PathPredictProcess(ConsumerProcess):
                     y = self.current_predict_result[cls][target_id][y_position]
                     result_id[target_id] = ((x, y, 0, 0), 1.0)
                     result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
+                    self.logger.debug(f'Predicted class:{cls}, id:{target_id}')
                     # print(i,':',cls,':',result_id)
 
-                t2 = time.perf_counter()
-                fps = 1 / (t2 - t1)
-                result_each_subframe[subframe] = (result_class, fps)
+                t_subframe_end = time.perf_counter()
+                sub_fps = 1 / (t_subframe_end - t_subframe_start)
+                result_each_subframe[subframe] = (result_class, sub_fps)
                 self.all_predict_result[frame].update(result_each_subframe)
-
-        self.save_result_to_file(self.results_save_dir, self.all_predict_result)
-        del self.all_predict_result
-
-        while predict_queue.qsize() > 0:
-            predict_queue.get()
+                self.logger.debug(f'Update subframe result to store dict')
 
     def run_end(self) -> None:
         super().run_end()

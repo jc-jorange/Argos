@@ -6,6 +6,7 @@ import torch
 import math
 from collections import Iterable
 
+
 @unique
 class E_SharedSaveType(Enum):
     Queue = 1
@@ -16,6 +17,17 @@ class E_SharedSaveType(Enum):
     SharedValue_Float = 6
 
 
+@unique
+class E_OutputPortDataType(Enum):
+    Default = 1
+    CameraTrack = 2
+
+
+dict_OutputPortDataType = {
+    E_OutputPortDataType.Default.name: any,
+    E_OutputPortDataType.CameraTrack.name: (int, int, np.ndarray),
+}
+
 format_SharedDataInfo = (E_SharedSaveType, tuple, int)
 
 
@@ -23,11 +35,13 @@ class Struc_ConsumerOutputPort:
     def __init__(self,
                  opt,
                  output_type: E_SharedSaveType,
+                 data_type: E_OutputPortDataType,
                  data_shape: tuple
                  ):
         self.opt = opt
 
         self.output_type = output_type
+        self.data_type = data_type
         self.data_shape = None
         self.output = None
 
@@ -63,6 +77,51 @@ class Struc_ConsumerOutputPort:
             result = self.output.cpu().numpy()
 
         return result
+
+    def send(self, data) -> bool:
+        b_result = False
+
+        if self.output_type == E_SharedSaveType.Queue:
+            self.output: mp.Queue
+            self.output.put(data)
+            b_result = True
+        elif self.output_type == E_SharedSaveType.SharedArray_Float:
+            self.output: mp.Array
+            to_send = np.asarray(data)
+            if to_send.shape == self.data_shape:
+                to_send = to_send.flatten()
+                self.output[:] = to_send[:]
+                b_result = True
+        elif self.output_type == E_SharedSaveType.SharedValue_Float:
+            self.output: mp.Value
+            self.output.value = data
+            b_result = True
+        elif self.output_type == E_SharedSaveType.Tensor:
+            if isinstance(data, torch.Tensor):
+                self.output[:] = data[:]
+            else:
+                to_send = np.asarray(data)
+                self.output[:] = to_send[:]
+            b_result = True
+
+        return b_result
+
+    def size(self) -> int:
+        if self.output_type == E_SharedSaveType.Queue:
+            self.output: mp.Queue
+            return self.output.qsize()
+        else:
+            return 1
+
+    def clear(self) -> None:
+        if self.output_type == E_SharedSaveType.Queue:
+            self.output: mp.Queue
+            with self.output.mutex:
+                self.output.queue.clear()
+        else:
+            del self.output
+
+        torch.cuda.empty_cache()
 
 
 class Struc_SharedData:
@@ -135,7 +194,7 @@ class Struc_SharedData:
         self.device = device
         self._data = self._generate_output_value(output_format)
 
-    def set(self, data_set):
+    def set(self, data_set) -> None:
         data = self._data
         data_type = self.data_type
 
@@ -155,7 +214,7 @@ class Struc_SharedData:
                 data_type == E_SharedSaveType.SharedValue_Float:
             data.value = data_set
 
-    def get(self):
+    def get(self) -> any:
         data_type = self.data_type
         data = self._data
 
@@ -179,22 +238,29 @@ class Struc_SharedData:
                 data_type == E_SharedSaveType.SharedValue_Float:
             return data.value
 
-    def clear(self):
+        else:
+            raise ValueError
+
+    def clear(self) -> None:
         data_type = self.data_type
         data = self._data
 
         if data_type == E_SharedSaveType.Queue:
             with data.mutex:
                 data.queue.clear()
+        else:
+            del data
 
-    def size(self):
+        torch.cuda.empty_cache()
+
+    def size(self) -> int:
         data_type = self.data_type
         data = self._data
 
         if data_type == E_SharedSaveType.Queue:
-            return [data.qsize()]
+            return data.qsize()
         else:
-            return list(self.data_shape)
+            return 1
 
 
 from .process import factory_process_all

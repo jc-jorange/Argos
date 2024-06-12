@@ -2,7 +2,7 @@ import cv2
 import numpy
 from enum import Enum, unique
 
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType
 from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
 from lib.multiprocess_pipeline.process import ConsumerProcess
 from lib.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker
@@ -24,6 +24,7 @@ class TrackerProcess(ConsumerProcess):
     save_type = [wr.E_text_result_type.raw, wr.E_text_result_type.mot]
 
     output_type = E_SharedSaveType.Queue
+    output_data_type = E_OutputPortDataType.CameraTrack
     output_shape = (1,)
 
     def __init__(self,
@@ -95,6 +96,8 @@ class TrackerProcess(ConsumerProcess):
 
             if not input_frame_id:
                 input_frame_id = 0
+            else:
+                self.logger.debug(f'Tracking Image @ frame {input_frame_id}')
 
             if self.frame_id == 0:
                 origin_shape = hub_image_origin_shape.get()
@@ -104,16 +107,16 @@ class TrackerProcess(ConsumerProcess):
 
             # --- run tracking
             # ----- track updates of each frame
-            if self.frame_id > 1:
-                self.timer_track.tic()
+            self.timer_track.tic()
 
             online_targets_dict = self.tracker.update_tracking(img, origin_shape)
 
-            if self.frame_id > 1:
-                self.timer_track.toc()
+            self.timer_track.toc()
+            self.logger.debug(f'Tracking time: {self.timer_track.diff} s')
             # -----
 
             result_per_subframe = {}
+            total_track_count = 0
             for cls_id in range(self.info_data.classes_max_num):  # process each class id
                 online_targets = online_targets_dict[cls_id]
                 result_per_subframe[cls_id] = {}
@@ -129,9 +132,13 @@ class TrackerProcess(ConsumerProcess):
                     if tlwh[2] * tlwh[3] > self.min_box_area:  # and not vertical:
                         result_per_subframe[cls_id][t_id] = (tlwh, score)
                         self.current_track_result[cls_id, t_id] = xywh
+                        total_track_count += 1
+                        self.logger.debug(f'Tracked class:{cls_id}, id:{t_id}')
             self.all_frame_results[input_frame_id] = {0: (result_per_subframe, self.fps_loop_avg)}
+            self.logger.debug(f'Tracked {total_track_count} objects')
 
-            self.output_port.output.put((self.frame_id, 0, self.current_track_result))
+            self.output_port.send((self.frame_id, 0, self.current_track_result))
+            self.logger.debug(f'Send track results to next')
 
             # loop timer end record
             self.timer_loop.toc()
@@ -143,6 +150,7 @@ class TrackerProcess(ConsumerProcess):
             self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
 
             self.save_result_to_file(self.results_save_dir, self.all_frame_results)
+            self.logger.debug(f'Save track results to file')
             self.all_frame_results = {}
 
             if self.frame_id % 10 == 0 and self.frame_id != 0:
@@ -155,25 +163,13 @@ class TrackerProcess(ConsumerProcess):
                 )
 
             self.logger.debug(
-                'Processing frame {}: {:.2f} track current fps, {} s'.format(
-                    self.frame_id,
-                    self.fps_neuralnetwork_current,
-                    1.0 / self.fps_neuralnetwork_current
-                )
+                f'Processing frame {self.frame_id}: {self.fps_neuralnetwork_current:.2f} track current fps,'
+                f' {1.0 / self.fps_neuralnetwork_current} s'
             )
             self.logger.debug(
-                'Processing frame {}: {:.2f} loop current fps, {} s'.format(
-                    self.frame_id,
-                    self.fps_loop_current,
-                    1.0 / self.fps_loop_current
-                )
+                f'Processing frame {self.frame_id}: {self.fps_loop_current:.2f} '
+                f'loop current fps, {1.0 / self.fps_loop_current} s'
             )
-
-        # self.save_result_to_file(self.results_save_dir, self.all_frame_results)
-        # del self.all_frame_results
-
-        while self.output_port.output.qsize() > 0:
-            self.output_port.output.get()
 
     def run_end(self) -> None:
         super().run_end()

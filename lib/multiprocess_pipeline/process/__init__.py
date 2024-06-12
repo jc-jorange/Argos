@@ -131,11 +131,13 @@ class ProducerProcess(BaseProcess):
         super(ProducerProcess, self).__init__(*args, **kwargs,)
 
 
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, Struc_ConsumerOutputPort
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, Struc_ConsumerOutputPort
 
 
 class ConsumerProcess(BaseProcess):
     output_type: E_SharedSaveType = E_SharedSaveType.Queue
+    output_data_type: E_OutputPortDataType = E_OutputPortDataType.Default
+    output_buffer: int = 8
     data_shape: tuple = (1,)
     results_save_type = [wr.E_text_result_type.raw]
 
@@ -145,7 +147,10 @@ class ConsumerProcess(BaseProcess):
         super(ConsumerProcess, self).__init__(*args, **kwargs,)
         self.check_results_save_type(self.results_save_type)
 
-        self.output_port = Struc_ConsumerOutputPort(self.opt, self.output_type, self.data_shape)
+        self.output_port = Struc_ConsumerOutputPort(self.opt,
+                                                    self.output_type,
+                                                    self.output_data_type,
+                                                    self.data_shape)
         self.last_process_port = last_process_port
 
     @staticmethod
@@ -169,6 +174,10 @@ class ConsumerProcess(BaseProcess):
             )
             b_save_result = True
         return b_save_result
+
+    def run_end(self) -> None:
+        super(ConsumerProcess, self).run_end()
+        self.output_port.clear()
 
 
 class PostProcess(BaseProcess):
