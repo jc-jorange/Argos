@@ -3,7 +3,7 @@ import inspect
 
 from ..CameraTrans import CameraTransProcess_Master
 from lib.multiprocess_pipeline.workers.camera_trans_loader import factory_camera_trans_loader, E_CameraTransLoaderName
-from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
+from lib.multiprocess_pipeline.SharedMemory import E_PipelineSharedDataName
 
 
 class CameraTransLoaderProcess(CameraTransProcess_Master):
@@ -58,29 +58,29 @@ class CameraTransLoaderProcess(CameraTransProcess_Master):
         hub_camera_timestamp = \
             self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.TransformTimestamp.name]
 
-        each_frame_start_time = time.perf_counter()
         start_time = time.perf_counter()
         for timestamp, path, trans in self.loader:
             if timestamp and trans:
-                each_frame_end_time = time.perf_counter()
-                delta_time_each = each_frame_end_time - each_frame_start_time
-                delta_time_all = each_frame_end_time - start_time
+                each_frame_start_time = time.perf_counter()
+                self.count += 1
+                self.logger.debug(f'Read Camera Transform {self.count} from {path}')
 
                 hub_camera_timestamp.set(timestamp)
                 hub_camera_trans.set(trans)
-                self.count += 1
+                self.logger.debug(f'Set Camera Transform and timestamp')
 
+                each_frame_end_time = time.perf_counter()
+                delta_time_each = each_frame_end_time - each_frame_start_time
+                delta_time_all = each_frame_end_time - start_time
                 self.dps_avg = self.count / delta_time_all
                 self.dps_cur = 1 / delta_time_each
 
-                # if self.count % 10 == 0 and self.count != 0:
-                #     self.logger.info(
-                #         f'Processing frame {self.count}: '
-                #         f'average dps: {self.dps_avg:.2f}, '
-                #         f'current dps: {self.dps_cur:.2f}; '
-                #     )
-
-                each_frame_start_time = time.perf_counter()
+                if self.count % 10 == 0 and self.count != 0:
+                    self.logger.info(
+                        f'Reading Data count {self.count}: '
+                        f'average dps: {self.dps_avg:.2f}, '
+                        f'current dps: {self.dps_cur:.2f}; '
+                    )
 
         end_time = time.perf_counter()
         self.load_time = end_time - start_time

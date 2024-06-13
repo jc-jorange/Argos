@@ -1,6 +1,5 @@
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_PipelineSharedDataName
 from lib.multiprocess_pipeline.process import ProducerProcess
-from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
 
 
 class ImageProcess_Master(ProducerProcess):

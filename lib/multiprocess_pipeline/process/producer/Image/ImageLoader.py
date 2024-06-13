@@ -7,7 +7,7 @@ import torch
 
 from ..Image import ImageProcess_Master
 from lib.multiprocess_pipeline.workers.image_loader import E_ImageLoaderName, factory_image_loader, BaseImageLoader
-from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
+from lib.multiprocess_pipeline.SharedMemory import E_PipelineSharedDataName
 
 
 @unique
@@ -42,7 +42,10 @@ class ImageLoaderProcess(ImageProcess_Master):
         if self.loader_name not in E_ImageLoaderName.__members__.keys():
             raise KeyError(f'loader {self.loader_name} is not a valid loader')
 
+        self.count = 0
         self.load_time = 0.0
+        self.fps_cur = 0
+        self.fps_avg = 0
 
     def run_begin(self) -> None:
         super(ImageLoaderProcess, self).run_begin()
@@ -73,6 +76,9 @@ class ImageLoaderProcess(ImageProcess_Master):
 
         try:
             for timestamp, path, img_0, img in self.data_loader:
+                t_each_start = time.perf_counter()
+                self.count += 1
+                self.logger.debug(f'Read Img {int(self.data_loader.count)} from {path}')
                 if not self.opt.realtime:
                     while hub_image_data.size()[0] > self.load_buffer and \
                             self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
@@ -83,14 +89,26 @@ class ImageLoaderProcess(ImageProcess_Master):
                 hub_image_origin_shape.set(img_0.shape[:])
                 hub_image_data.set(img)
                 hub_timestamp.set(timestamp)
+                self.logger.debug(f'Set Img and timestamp')
+
+                t_each_end = time.perf_counter()
+                dt_each = t_each_end - t_each_start
+                dt_all = t_each_end - start_time
+                self.fps_cur = 1 / dt_each
+                self.fps_avg = self.count / dt_all
+
+                if self.count % 10 == 0 and self.count != 0:
+                    self.logger.info(
+                        f'Reading frame count {self.count}: '
+                        f'average dps: {self.fps_avg:.2f}, '
+                        f'current dps: {self.fps_cur:.2f}; '
+                    )
 
                 cv2.imwrite(
                     os.path.join(self.results_save_dir, '{:05d}.jpg'.format(self.data_loader.count)),
                     img_0
                 )
-
-                cv2.imshow('test', img_0)
-                cv2.waitKey(1)
+                self.logger.debug(f'Save img {int(self.data_loader.count)} from {path}')
 
         except:
             traceback.print_exc()

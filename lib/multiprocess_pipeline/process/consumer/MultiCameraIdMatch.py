@@ -5,12 +5,11 @@ import time
 import numpy
 
 from lib.multiprocess_pipeline.process import ConsumerProcess
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, E_PipelineSharedDataName
 from lib.multiprocess_pipeline.SharedMemory import Struc_SharedData, Struc_ConsumerOutputPort
 from lib.multiprocess_pipeline.workers.matchor import factory_matchor
 from lib.multiprocess_pipeline.workers.postprocess.utils.write_result import convert_numpy_to_dict
 from lib.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
-from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
 
 
 class MultiCameraIdMatchProcess(ConsumerProcess):
@@ -52,6 +51,10 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         self.all_camera_timestamp = []
         self.match_times = 0
 
+        self_shared_data = self.data_hub.dict_shared_data[self.pipeline_name]
+        self.b_read_together = E_PipelineSharedDataName.CameraTransform.name in self_shared_data.keys() \
+                               and E_PipelineSharedDataName.TransformTimestamp.name in self_shared_data.keys()
+
     def run_begin(self) -> None:
         super(MultiCameraIdMatchProcess, self).run_begin()
 
@@ -78,10 +81,9 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
     def _get_all_camera_transform(self) -> (list, list):
         all_transform = []
         all_timestamp = []
-        self_shared_data = self.data_hub.dict_shared_data[self.pipeline_name]
 
-        if E_PipelineSharedDataName.CameraTransform.name in self_shared_data.keys() \
-                and E_PipelineSharedDataName.TransformTimestamp.name in self_shared_data.keys():
+        if self.b_read_together:
+            self_shared_data = self.data_hub.dict_shared_data[self.pipeline_name]
             loop_length = min(self_shared_data[E_PipelineSharedDataName.CameraTransform.name].size(),
                               self_shared_data[E_PipelineSharedDataName.TransformTimestamp.name].size())
             for i in range(loop_length):
@@ -115,28 +117,30 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         return all_transform, all_timestamp
 
     def read_camera_transform_and_timestamp(self, pipeline: str, i: int) -> (numpy.ndarray, int):
-        if self.all_camera_timestamp and self.all_camera_transform:
+        cur_trans = None
+        cur_timestamp = None
+
+        if self.b_read_together:
             cur_trans = self.all_camera_transform[i][pipeline]
             cur_timestamp = self.all_camera_timestamp[i][pipeline]
-            return cur_trans, cur_timestamp
         else:
-            data_transform = self.data_hub.dict_shared_data[pipeline][E_PipelineSharedDataName.CameraTransform.name]
-            timestamp_trans = self.data_hub.dict_shared_data[pipeline][E_PipelineSharedDataName.TransformTimestamp.name]
+            data_transform = self.all_camera_transform[0][pipeline]
+            timestamp_trans = self.all_camera_timestamp[0][pipeline]
 
             cur_trans = data_transform.get()
             cur_timestamp = timestamp_trans.get()
-            return cur_trans, cur_timestamp
+
+        return cur_trans, cur_timestamp
 
     def compare_timestamp_get_transform(self, pipeline: str, timestamp_image: int) -> numpy.ndarray:
         last_trans = None
         last_d_timestamp = 999999999999
         loop_length: int
 
-        dummy_dict: dict = self.all_camera_transform[0]
-        if isinstance(dummy_dict[pipeline], Struc_SharedData):
-            loop_length = dummy_dict[pipeline].size()
+        if self.b_read_together:
+            loop_length = len(self.all_camera_transform[0])
         else:
-            loop_length = len(dummy_dict)
+            loop_length = self.all_camera_transform[0][pipeline].size()
 
         for i in range(loop_length):
             cur_trans, cur_timestamp = self.read_camera_transform_and_timestamp(pipeline, i)
@@ -228,10 +232,11 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                     fps = 1 / (t_match_each_end - t_match_each_start)
                     result_frame = convert_numpy_to_dict(match_result, frame, subframe, fps)
 
-                    self.output_port.send(result_frame)
+                    if self.output_port.size() < self.output_buffer:
+                        self.logger.debug(f'Send data to next')
+                        self.output_port.send(result_frame)
 
                     save_dir = self.results_save_dir[pipeline_name]
-
                     self.save_result_to_file(save_dir, result_frame)
 
                 self.match_times += 1

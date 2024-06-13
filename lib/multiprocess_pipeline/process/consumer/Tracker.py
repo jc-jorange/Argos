@@ -1,9 +1,7 @@
-import cv2
 import numpy
 from enum import Enum, unique
 
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType
-from lib.multiprocess_pipeline.process.SharedDataName import E_PipelineSharedDataName
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, E_PipelineSharedDataName
 from lib.multiprocess_pipeline.process import ConsumerProcess
 from lib.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker
 from lib.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
