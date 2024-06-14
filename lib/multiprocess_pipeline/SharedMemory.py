@@ -39,7 +39,18 @@ dict_OutputPortDataType = {
     E_OutputPortDataType.CameraTrack.name: (int, int, np.ndarray),
 }
 
-format_SharedDataInfo = (E_SharedSaveType, tuple, int)
+@unique
+class E_SharedDataFormat(Enum):
+    data_type = 1
+    data_shape = 2
+    data_value = 3
+
+
+dict_SharedDataInfoFormat = {
+    E_SharedDataFormat.data_type.name: E_SharedSaveType,
+    E_SharedDataFormat.data_shape.name: tuple,
+    E_SharedDataFormat.data_value.name: any,
+}
 
 
 class Struc_ConsumerOutputPort:
@@ -141,13 +152,13 @@ class Struc_SharedData:
     data_shape = ()
     device = 'cpu'
 
-    def _generate_output_value(self, output_format: format_SharedDataInfo) -> any:
-        data_type = output_format[0]
+    def _generate_output_value(self, output_format: dict_SharedDataInfoFormat) -> any:
+        data_type = output_format[E_SharedDataFormat.data_type.name]
         data_type = data_type if isinstance(data_type, E_SharedSaveType) else E_SharedSaveType[data_type]
         self.data_type = data_type
-        data_shape = output_format[1]
+        data_shape = output_format[E_SharedDataFormat.data_shape.name]
         self.data_shape = tuple(data_shape)
-        default_value = output_format[2]
+        default_value = output_format[E_SharedDataFormat.data_value.name]
 
         if data_type == E_SharedSaveType.Queue:
             output_value = mp.Queue()
@@ -201,7 +212,7 @@ class Struc_SharedData:
 
     def __init__(self,
                  device: str,
-                 output_format: format_SharedDataInfo):
+                 output_format: dict_SharedDataInfoFormat):
         self.device = device
         self._data = self._generate_output_value(output_format)
 

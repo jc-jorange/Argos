@@ -3,11 +3,10 @@ import os
 from multiprocessing import Process, Value
 from enum import Enum, unique
 
-from lib.opts import opts
 from lib.utils.logger import ALL_LoggerContainer
 from lib.multiprocess_pipeline.workers.tracker.utils.utils import mkdir_if_missing
 import lib.multiprocess_pipeline.workers.postprocess.utils.write_result as wr
-from lib.multiprocess_pipeline.SharedMemory import format_SharedDataInfo
+from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, Struc_ConsumerOutputPort
 
 name_Process_Result_dir = 'result'
 
@@ -32,7 +31,7 @@ class BaseProcess(Process):
     def __init__(self,
                  data_hub,
                  pipeline_name: str,
-                 opt: opts,
+                 opt,
                  ) -> None:
         super(BaseProcess, self).__init__()
 
@@ -97,41 +96,14 @@ class BaseProcess(Process):
         return str(new_dir)
 
     @staticmethod
-    def check_shared_data(shared_data: dict) -> bool:
-        l_wrong_num = []
-        l_wrong_position = []
-        l_wrong_element = []
-        for k, v in shared_data.items():
-            if not isinstance(v, tuple):
-                v = tuple(v)
-                shared_data[k] = v
-            if len(v) != len(format_SharedDataInfo):
-                l_wrong_num.append(k)
-                continue
-            for e in v:
-                if e not in format_SharedDataInfo:
-                    l_wrong_element.append(k)
-                    break
-                if v.index(e) != format_SharedDataInfo.index(e):
-                    l_wrong_position.append(k)
-                    break
-
-        if l_wrong_num or l_wrong_position or l_wrong_element:
-            raise ValueError(f'process shared data check not pass in '
-                             f'wrong element number: {l_wrong_num}, '
-                             f'wrong position: {l_wrong_position}, '
-                             f'wrong element: {l_wrong_element}')
-        else:
-            return True
+    def check_before_instance(opt, *args, **kwargs) -> bool:
+        return True
 
 
 class ProducerProcess(BaseProcess):
     def __init__(self,
                  *args, **kwargs) -> None:
         super(ProducerProcess, self).__init__(*args, **kwargs,)
-
-
-from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, Struc_ConsumerOutputPort
 
 
 class ConsumerProcess(BaseProcess):

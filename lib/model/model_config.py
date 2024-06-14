@@ -88,7 +88,7 @@ def merge_config(cfg, args_cfg):
     cfg.freeze()
 
 
-def check_cfg(cfg_path, cfg_name):
+def check_model_cfg_exist(cfg_path, cfg_name):
     for file in os.listdir(cfg_path):
         if os.path.splitext(file)[0] == cfg_name:
             return os.path.join(cfg_path, file)

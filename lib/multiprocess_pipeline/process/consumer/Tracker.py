@@ -1,6 +1,8 @@
 import numpy
 from enum import Enum, unique
+from yacs.config import CfgNode as CN
 
+from lib.model.model_config import check_model_cfg_exist, check_model_architecture
 from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, E_PipelineSharedDataName
 from lib.multiprocess_pipeline.process import ConsumerProcess
 from lib.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker

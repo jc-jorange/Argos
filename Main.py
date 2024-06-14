@@ -202,7 +202,7 @@ def track(opt_data):
                         pass
                     elif pipeline_branch_name == E_pipeline_branch.static_shared_value.name:
                         data_hub.dict_shared_data[pipeline_name].update(
-                            {pipeline_leaf_name: Struc_SharedData(opt_data.device, tuple(pipeline_kwargs.values()))}
+                            {pipeline_leaf_name: Struc_SharedData(opt_data.device, pipeline_kwargs)}
                         )
                         continue
 

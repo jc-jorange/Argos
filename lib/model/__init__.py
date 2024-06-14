@@ -11,7 +11,7 @@ import yaml
 from collections import OrderedDict
 
 from lib.utils.logger import ALL_LoggerContainer
-from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture, check_cfg
+from lib.model.model_config import model_cfg_master, merge_config, check_model_architecture, check_model_cfg_exist
 from lib.model.model_config import E_arch_position, E_model_general_info, E_model_part_input_info, E_model_part_input_info
 from lib.model.model_config import model_general_info_default_dict
 from .networks.model_part_config import E_model_part_info
@@ -122,7 +122,7 @@ class BaseModel(nn.Module):
 
         self.opt = opt
 
-        cfg_path = check_cfg(self.opt.arch_cfg_path, arch)
+        cfg_path = check_model_cfg_exist(self.opt.arch_cfg_path, arch)
         self.cfg = model_cfg_master
         merge_config(self.cfg, cfg_path)
         # self.cfg = self.opt.model_config
@@ -162,7 +162,7 @@ class BaseModel(nn.Module):
         model_cfg_path = os.path.join(self.opt.part_path, part_name, model_name, 'cfg')
 
         part_cfg_path = \
-            check_cfg(model_cfg_path, cfg_model[part_name][E_model_part_info(2).name])
+            check_model_cfg_exist(model_cfg_path, cfg_model[part_name][E_model_part_info(2).name])
 
         with open(part_cfg_path, 'r') as f:
             arg = yaml.safe_load(f)

@@ -6,7 +6,7 @@ import argparse
 import os
 import time
 import torch
-from lib.model.model_config import check_cfg
+from lib.multiprocess_pipeline.utils import check_pipeline_cfg
 
 
 class opts(object):
@@ -23,9 +23,6 @@ class opts(object):
         self.parser.add_argument('--exp_id',
                                  default='custom')
 
-        # self.parser.add_argument('--load_model',
-        #                          default='',
-        #                          help='path to pretrained model')
         self.parser.add_argument('--resume',
                                  action='store_true',
                                  help='resume an experiment. '
@@ -198,6 +195,8 @@ class opts(object):
         #     opt.load_model = os.path.join(model_path, 'model_last.pth')
 
         opt.device = self.select_device(opt)
+
+        check_pipeline_cfg(opt.pipeline_cfg)
 
         # cfg_path = check_cfg(opt.arch_cfg_path, opt.arch)
 

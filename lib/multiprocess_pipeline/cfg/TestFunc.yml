@@ -21,11 +21,11 @@ FuncTest_1:
 
   static_shared_value:
     CamIntrinsicPara:
-      type: SharedArray_Float
-      shape: [ 3, 4 ]
-      value: [ [ 11.11, 0., 128.0, 0 ],
-               [ 0, 11.11, 128.0, 0 ],
-               [ 0, 0, 1.0000, 0 ] ]
+      data_type: SharedArray_Float
+      data_shape: [ 3, 4 ]
+      data_value: [ [ 11.11, 0., 128.0, 0 ],
+                   [ 0, 11.11, 128.0, 0 ],
+                   [ 0, 0, 1.0000, 0 ] ]
 
 FuncTest_2:
   producer:
@@ -50,11 +50,11 @@ FuncTest_2:
 
   static_shared_value:
     CamIntrinsicPara:
-      type: SharedArray_Float
-      shape: [ 3, 4 ]
-      value: [ [ 11.11, 0., 128.0, 0 ],
-               [ 0, 11.11, 128.0, 0 ],
-               [ 0, 0, 1.0000, 0 ] ]
+      data_type: SharedArray_Float
+      data_shape: [ 3, 4 ]
+      data_value: [ [ 11.11, 0., 128.0, 0 ],
+                   [ 0, 11.11, 128.0, 0 ],
+                   [ 0, 0, 1.0000, 0 ] ]
 
 #FuncTest_3:
 #  producer:

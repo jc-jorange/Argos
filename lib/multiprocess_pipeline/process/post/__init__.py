@@ -1,7 +1,7 @@
 from enum import Enum, unique
 
-from .ResultsVisualize.MP_IndiPost import IndiResultsVisualizeProcess
-from .ResultsVisualize.MP_GlobalPost import GloResultsVisualizeProcess
+from .ResultsVisualize.IndiPost import IndiResultsVisualizeProcess
+from .ResultsVisualize.GlobalPost import GloResultsVisualizeProcess
 
 
 @unique
