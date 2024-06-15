@@ -21,8 +21,14 @@ class PathPredictProcess(ConsumerProcess):
 
     def __init__(self,
                  predictor_name: str,
-                 *args, **kwargs):
+                 *args,
+                 max_step=300,
+                 max_distance=50,
+                 **kwargs):
         super().__init__(*args, **kwargs)
+        self.predictor_name = predictor_name
+        self.max_step = max_step
+        self.max_distance = max_distance
 
         if self.last_process_port.data_type != E_OutputPortDataType.CameraTrack:
             raise TypeError('Connect last consumer process output data type not fit')
@@ -30,14 +36,17 @@ class PathPredictProcess(ConsumerProcess):
         self.current_track_result = None
         self.current_predict_result = None
         self.all_predict_result = {}
-        self.predictor_name = predictor_name
+
         self.predictor = None
 
     def run_begin(self) -> None:
         super(PathPredictProcess, self).run_begin()
 
         self.logger.info(f'Creating predictor {self.predictor_name}')
-        self.predictor = factory_predictor[self.predictor_name]()
+        self.predictor = factory_predictor[self.predictor_name](
+            max_step=self.max_step,
+            max_distance=self.max_distance
+        )
 
     def run_action(self) -> None:
         super(PathPredictProcess, self).run_action()

@@ -49,20 +49,25 @@ class ImageLoaderProcess(ImageProcess_Master):
 
     def run_begin(self) -> None:
         super(ImageLoaderProcess, self).run_begin()
-
-        self.logger.info(f"Start Creating Image Dataloader @ {self.image_path}")
-
         if os.path.isfile(self.timestamp_path):
             self.logger.info(f'Reading timestamp @ {self.timestamp_path}')
         else:
             self.logger.info(f'Reading timestamp dynamically')
 
-        self.logger.info(f'Waiting read @ {self.image_path}')
+        self.logger.info(f"Start Creating Image Dataloader @ {self.image_path}")
         self.data_loader: BaseImageLoader = \
             factory_image_loader[self.loader_name](
                 self.image_path,
                 self.normalized_image_shape,
                 timestamp_path=self.timestamp_path)
+
+        t1 = time.perf_counter()
+        while not self.data_loader.pre_process():
+            t2 = time.perf_counter()
+            dt = t2 - t1
+            if dt >= 5:
+                self.logger.info(f'Waiting read @ {self.image_path}')
+                t1 = t2
 
     def run_action(self) -> None:
         self.logger.info("Start loading images")
@@ -80,7 +85,7 @@ class ImageLoaderProcess(ImageProcess_Master):
                 self.count += 1
                 self.logger.debug(f'Read Img {int(self.data_loader.count)} from {path}')
                 if not self.opt.realtime:
-                    while hub_image_data.size()[0] > self.load_buffer and \
+                    while hub_image_data.size() > self.load_buffer and \
                             self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
                         pass
                 img = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
@@ -127,7 +132,7 @@ class ImageLoaderProcess(ImageProcess_Master):
             self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageOriginShape.name]
         hub_frame_id = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.FrameID.name]
         if not self.opt.realtime:
-            while hub_image_data.size()[0] > 0:
+            for i in range(hub_image_data.size()):
                 try:
                     hub_image_data.get()
                     hub_image_origin_shape.get()

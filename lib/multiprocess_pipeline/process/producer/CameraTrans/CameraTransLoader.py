@@ -96,7 +96,7 @@ class CameraTransLoaderProcess(CameraTransProcess_Master):
             self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.TransformTimestamp.name]
 
         if not self.opt.realtime:
-            while hub_camera_trans.size()[0] > 0:
+            for i in range(hub_camera_trans.size()):
                 try:
                     hub_camera_trans.get()
                     hub_camera_timestamp.get()

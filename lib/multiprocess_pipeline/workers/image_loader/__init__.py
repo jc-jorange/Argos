@@ -37,6 +37,9 @@ class BaseImageLoader:
     def read_action(self, idx) -> (int, str, np.ndarray):
         return 0, '', np.ndarray
 
+    def pre_process(self) -> bool:
+        return True
+
     def __iter__(self):
         return self
 

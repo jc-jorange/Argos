@@ -48,9 +48,27 @@ class AddressImageLoader(BaseImageLoader):
         self.width = 0
         self.height = 0
 
-        self.connect()
+        self.misread_count = 0
 
-    def connect(self):
+    def pre_process(self) -> bool:
+        super(AddressImageLoader, self).pre_process()
+        if self.ConnectionSocket:
+            pass
+        else:
+            self.connect()
+
+        self.b_socket_alive = True
+        first_data = self.read_action(0)[0]
+        if first_data:
+            b_has_data = True
+            while b_has_data:
+                b_has_data = self.flush_listen()
+
+            return True
+        else:
+            return False
+
+    def connect(self) -> None:
         if self.connect_type == E_SupportConnectionType.TCP.name:
             server_socket = socket(AF_INET, SOCK_STREAM)
             server_socket.bind(self.address)
@@ -61,16 +79,6 @@ class AddressImageLoader(BaseImageLoader):
             server_socket = socket(AF_INET, SOCK_DGRAM)
             server_socket.bind(self.address)
             self.ConnectionSocket = server_socket
-
-            first_data = None
-            while not first_data:
-                self.b_socket_alive = True
-                first_data = self.read_action(0)[0]
-
-            b_has_data = True
-            while b_has_data:
-                b_has_data = self.flush_listen()
-
         else:
             raise
 
@@ -117,8 +125,8 @@ class AddressImageLoader(BaseImageLoader):
                             img = cv2.imdecode(img, cv2.IMREAD_COLOR) # BGR
                             self.image_shape = img.shape
                             return recv_timestamp, self.data_path, img
-                        except:
-                            traceback.print_exc()
+                        except AttributeError:
+                            self.misread_count += 1
                             pass
 
                     elif not flag_head:
