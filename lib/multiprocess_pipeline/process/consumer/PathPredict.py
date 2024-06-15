@@ -78,9 +78,9 @@ class PathPredictProcess(ConsumerProcess):
                 frame_time = t_frame_end - t_frame_start
                 frame = frame_get
 
-                if frame and subframe and frame % 10 == 0:
+                if frame and frame % 10 == 0:
                     self.logger.info(f'Predict {subframe} subframe In frame {frame} '
-                                     f'by {frame_time} s ({1 / frame_time} fps)')
+                                     f'by {frame_time} s ({subframe / frame_time} fps)')
 
                 self.save_result_to_file(self.results_save_dir, self.all_predict_result)
                 self.logger.debug(f'Save last frame results to file')
@@ -94,7 +94,7 @@ class PathPredictProcess(ConsumerProcess):
                 self.current_predict_result = self.predictor.set_new_base(self.current_track_result)
                 self.logger.debug(f'Set Predict base and set base as predict result')
 
-            else:
+            elif frame:
                 self.logger.debug(f'Start subframe predict @ frame {frame}')
                 subframe_start_time = time.perf_counter()
 
@@ -107,38 +107,39 @@ class PathPredictProcess(ConsumerProcess):
                 delta_t_predict = subframe_time_end - subframe_start_time
                 self.logger.debug(f'Predicted @ frame {frame} - subframe {subframe} by {delta_t_predict} s')
 
-            if self.output_port.size() < self.output_buffer:
-                self.output_port.send((frame, subframe, self.current_predict_result))
-                self.logger.debug(f'Send predict results to next')
-            else:
-                self.logger.debug(f'Output port over {self.output_buffer} buffer size')
+            if frame:
+                if self.output_port.size() < self.output_buffer:
+                    self.output_port.send((frame, subframe, self.current_predict_result))
+                    self.logger.debug(f'Send predict results to next')
+                else:
+                    self.logger.debug(f'Output port over {self.output_buffer} buffer size')
 
-            if isinstance(self.current_predict_result, np.ndarray):
-                result_each_subframe = {}
-                result_class = defaultdict(dict)
-                result_id = {}
-                valid_position = np.nonzero(self.current_predict_result)
-                target_num = len(valid_position[0]) // 4
-                # print(target_num)
-                for i in range(target_num):
-                    cls = valid_position[0][i * 4]
-                    target_id = valid_position[1][i * 4]
-                    x_position = valid_position[2][(i * 4)]
-                    y_position = valid_position[2][(i * 4) + 1]
-                    x = self.current_predict_result[cls][target_id][x_position]
-                    y = self.current_predict_result[cls][target_id][y_position]
-                    result_id[target_id] = ((x, y, 0, 0), 1.0)
-                    result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
-                    self.logger.debug(f'Predicted class:{cls}, id:{target_id}')
-                    # print(i,':',cls,':',result_id)
+                if isinstance(self.current_predict_result, np.ndarray):
+                    result_each_subframe = {}
+                    result_class = defaultdict(dict)
+                    result_id = {}
+                    valid_position = np.nonzero(self.current_predict_result)
+                    target_num = len(valid_position[0]) // 4
+                    # print(target_num)
+                    for i in range(target_num):
+                        cls = valid_position[0][i * 4]
+                        target_id = valid_position[1][i * 4]
+                        x_position = valid_position[2][(i * 4)]
+                        y_position = valid_position[2][(i * 4) + 1]
+                        x = self.current_predict_result[cls][target_id][x_position]
+                        y = self.current_predict_result[cls][target_id][y_position]
+                        result_id[target_id] = ((x, y, 0, 0), 1.0)
+                        result_class[cls][target_id] = ((x, y, 0, 0), 1.0)
+                        self.logger.debug(f'Predicted class:{cls}, id:{target_id}')
+                        # print(i,':',cls,':',result_id)
 
-                t_subframe_end = time.perf_counter()
-                sub_fps = 1 / (t_subframe_end - t_subframe_start)
-                result_each_subframe[subframe] = (result_class, sub_fps)
-                self.all_predict_result[frame].update(result_each_subframe)
-                self.logger.debug(f'Update subframe result to store dict')
+                    t_subframe_end = time.perf_counter()
+                    sub_fps = 1 / (t_subframe_end - t_subframe_start)
+                    result_each_subframe[subframe] = (result_class, sub_fps)
+                    self.all_predict_result[frame].update(result_each_subframe)
+                    self.logger.debug(f'Update subframe result to store dict')
 
     def run_end(self) -> None:
-        super().run_end()
+        super(PathPredictProcess, self).run_end()
 
         self.logger.info('-'*5 + 'Predict Finished' + '-'*5)

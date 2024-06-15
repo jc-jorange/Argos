@@ -47,6 +47,7 @@ class IndiResultsVisualizeProcess(ResultsVisualizeProcess_Master):
         while self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
             pass
 
+        self.logger.info(f'Start indi post saving')
         each_post: BasePost
         for each_post in self.post_process_list:
             each_post.process()

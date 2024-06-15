@@ -1,5 +1,6 @@
 import ctypes
 import os
+import traceback
 from multiprocessing import Process, Value
 from enum import Enum, unique
 
@@ -50,6 +51,7 @@ class BaseProcess(Process):
         self.logger = None
 
         self._b_hold_run = Value(ctypes.c_bool, True)
+        self._b_finished = Value(ctypes.c_bool, False)
 
     def run_begin(self) -> None:
         ALL_LoggerContainer.add_file_handler(self.name, self.name + self.log_name, self.main_save_dir)
@@ -83,10 +85,15 @@ class BaseProcess(Process):
 
         self.run_action()
 
+        self._b_finished.value = True
+
         self.run_end()
 
     def run_hold_state(self) -> bool:
         return self._b_hold_run.value
+
+    def ready_finished(self) -> bool:
+        return self._b_finished
 
     @staticmethod
     def making_dir(*args) -> str:
@@ -95,15 +102,19 @@ class BaseProcess(Process):
 
         return str(new_dir)
 
-    @staticmethod
-    def check_before_instance(opt, *args, **kwargs) -> bool:
-        return True
-
 
 class ProducerProcess(BaseProcess):
     def __init__(self,
                  *args, **kwargs) -> None:
         super(ProducerProcess, self).__init__(*args, **kwargs,)
+        self._b_receive = Value(ctypes.c_bool, True)
+
+    def recv_alive(self) -> bool:
+        return self._b_receive.value
+
+    def run_end(self) -> None:
+        super(ProducerProcess, self).run_end()
+        self._b_receive.value = False
 
 
 class ConsumerProcess(BaseProcess):
@@ -149,7 +160,9 @@ class ConsumerProcess(BaseProcess):
 
     def run_end(self) -> None:
         super(ConsumerProcess, self).run_end()
+        self.logger.info(f'{self.name} start clearing')
         self.output_port.clear()
+        self.logger.info(f'{self.name} clear over')
 
 
 class PostProcess(BaseProcess):

@@ -84,10 +84,13 @@ class ImageLoaderProcess(ImageProcess_Master):
                 t_each_start = time.perf_counter()
                 self.count += 1
                 self.logger.debug(f'Read Img {int(self.data_loader.count)} from {path}')
-                if not self.opt.realtime:
-                    while hub_image_data.size() > self.load_buffer and \
-                            self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
-                        pass
+                # if not self.opt.realtime:
+                #     while hub_image_data.size() > self.load_buffer:
+                #         # hub_frame_id.get()
+                #         # hub_image_origin_shape.get()
+                #         # hub_image_data.get()
+                #         # hub_timestamp.get()
+                #         pass
                 img = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
 
                 hub_frame_id.set(int(self.data_loader.count))
@@ -127,18 +130,6 @@ class ImageLoaderProcess(ImageProcess_Master):
             f"Total receive {self.data_loader.count} frames in {self.load_time} s"
         )
 
-        hub_image_data = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageData.name]
-        hub_image_origin_shape = \
-            self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageOriginShape.name]
-        hub_frame_id = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.FrameID.name]
-        if not self.opt.realtime:
-            for i in range(hub_image_data.size()):
-                try:
-                    hub_image_data.get()
-                    hub_image_origin_shape.get()
-                    hub_frame_id.get()
-                except RuntimeError:
-                    pass
-
-        super().run_end()
         self.logger.info('-' * 5 + 'Image Receiver Finished' + '-' * 5)
+
+        super(ImageLoaderProcess, self).run_end()

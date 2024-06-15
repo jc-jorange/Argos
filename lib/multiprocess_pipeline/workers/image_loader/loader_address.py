@@ -88,7 +88,7 @@ class AddressImageLoader(BaseImageLoader):
     def read_action(self, idx) -> (int, str, np.ndarray):
         super(AddressImageLoader, self).read_action(idx)
 
-        self.ConnectionSocket.settimeout(3)
+        self.ConnectionSocket.settimeout(1)
 
         recv_timestamp = None
         img = None

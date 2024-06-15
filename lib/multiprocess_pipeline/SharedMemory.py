@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import math
 from collections import Iterable
+import traceback
 
 
 @unique
@@ -87,7 +88,7 @@ class Struc_ConsumerOutputPort:
 
         if self.output_type == E_SharedSaveType.Queue:
             self.output: mp.Queue
-            result = self.output.get()
+            result = self.output.get(block=False)
 
         elif self.output_type == E_SharedSaveType.SharedArray_Float:
             self.output: mp.Array
@@ -105,7 +106,7 @@ class Struc_ConsumerOutputPort:
 
         if self.output_type == E_SharedSaveType.Queue:
             self.output: mp.Queue
-            self.output.put(data)
+            self.output.put(data, block=False)
             b_result = True
         elif self.output_type == E_SharedSaveType.SharedArray_Float:
             self.output: mp.Array
@@ -138,8 +139,12 @@ class Struc_ConsumerOutputPort:
     def clear(self) -> None:
         if self.output_type == E_SharedSaveType.Queue:
             self.output: mp.Queue
-            with self.output.mutex:
-                self.output.queue.clear()
+            while self.output.qsize() > 0:
+                try:
+                    self.output.get()
+                except RuntimeError:  # CUDA error: invalid device context
+                    pass
+            self.output.close()
         else:
             del self.output
 
@@ -268,8 +273,13 @@ class Struc_SharedData:
         data = self._data
 
         if data_type == E_SharedSaveType.Queue:
-            with data.mutex:
-                data.queue.clear()
+            data: mp.Queue
+            while data.qsize() > 0:
+                try:
+                    data.get()
+                except RuntimeError:  # CUDA error: invalid device context
+                    pass
+            data.close()
         else:
             del data
 

@@ -1,8 +1,7 @@
 import numpy
 from enum import Enum, unique
-from yacs.config import CfgNode as CN
+import multiprocessing
 
-from lib.model.model_config import check_model_cfg_exist, check_model_architecture
 from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, E_PipelineSharedDataName
 from lib.multiprocess_pipeline.process import ConsumerProcess
 from lib.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker
@@ -172,10 +171,11 @@ class TrackerProcess(ConsumerProcess):
             )
 
     def run_end(self) -> None:
-        super().run_end()
         self.logger.info(f'Final loop time {self.timer_loop.total_time}')
         self.logger.info(f'Final loop FPS {self.fps_loop_avg}')
         self.logger.info(f'Final inference time {self.timer_track.total_time}')
         self.logger.info(f'Final inference FPS {self.fps_neuralnetwork_avg}')
+
+        super(TrackerProcess, self).run_end()
 
         self.logger.info('-'*5 + 'Tracker Finished' + '-'*5)

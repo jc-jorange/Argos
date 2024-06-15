@@ -75,7 +75,7 @@ class CameraTransLoaderProcess(CameraTransProcess_Master):
                 self.dps_avg = self.count / delta_time_all
                 self.dps_cur = 1 / delta_time_each
 
-                if self.count % 10 == 0 and self.count != 0:
+                if self.count % 50 == 0 and self.count != 0:
                     self.logger.info(
                         f'Reading Data count {self.count}: '
                         f'average dps: {self.dps_avg:.2f}, '

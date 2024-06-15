@@ -43,10 +43,15 @@ class GloResultsVisualizeProcess(ResultsVisualizeProcess_Master):
         while self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
             pass
 
+        self.logger.info(f'Start global post saving')
         each_post: BasePost
         for each_post in self.post_process_list:
-            each_post.process()
-            self.logger.info('Saving result')
+            try:
+                each_post.process()
+                self.logger.info('Saving result')
+            except FileNotFoundError:
+                self.logger.info(f'No such file or directory: {each_post.save_dir}')
+                pass
 
     def run_end(self) -> None:
         self.logger.info('-' * 5 + 'Saving Finished' + '-' * 5)

@@ -6,7 +6,7 @@ import numpy
 
 from lib.multiprocess_pipeline.process import ConsumerProcess
 from lib.multiprocess_pipeline.SharedMemory import E_SharedSaveType, E_OutputPortDataType, E_PipelineSharedDataName
-from lib.multiprocess_pipeline.SharedMemory import Struc_SharedData, Struc_ConsumerOutputPort
+from lib.multiprocess_pipeline.SharedMemory import Struc_SharedData, Struc_ConsumerOutputPort, dict_OutputPortDataType
 from lib.multiprocess_pipeline.workers.matchor import factory_matchor
 from lib.multiprocess_pipeline.workers.postprocess.utils.write_result import convert_numpy_to_dict
 from lib.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
@@ -120,15 +120,16 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         cur_trans = None
         cur_timestamp = None
 
-        if self.b_read_together:
-            cur_trans = self.all_camera_transform[i][pipeline]
-            cur_timestamp = self.all_camera_timestamp[i][pipeline]
-        else:
-            data_transform = self.all_camera_transform[0][pipeline]
-            timestamp_trans = self.all_camera_timestamp[0][pipeline]
+        if self.all_camera_transform and self.all_camera_timestamp:
+            if self.b_read_together:
+                cur_trans = self.all_camera_transform[i][pipeline]
+                cur_timestamp = self.all_camera_timestamp[i][pipeline]
+            else:
+                data_transform = self.all_camera_transform[0][pipeline]
+                timestamp_trans = self.all_camera_timestamp[0][pipeline]
 
-            cur_trans = data_transform.get()
-            cur_timestamp = timestamp_trans.get()
+                cur_trans = data_transform.get()
+                cur_timestamp = timestamp_trans.get()
 
         return cur_trans, cur_timestamp
 
@@ -137,21 +138,22 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         last_d_timestamp = 999999999999
         loop_length: int
 
-        if self.b_read_together:
-            loop_length = len(self.all_camera_transform[0])
-        else:
-            loop_length = self.all_camera_transform[0][pipeline].size()
-
-        for i in range(loop_length):
-            cur_trans, cur_timestamp = self.read_camera_transform_and_timestamp(pipeline, i)
-            d_timestamp = cur_timestamp - timestamp_image
-            if d_timestamp * last_d_timestamp <= 0:
-                if not isinstance(last_trans, numpy.ndarray):
-                    last_trans = cur_trans
-                    return cur_trans if abs(d_timestamp) > abs(last_d_timestamp) else last_trans
+        if self.all_camera_transform and self.all_camera_timestamp:
+            if self.b_read_together:
+                loop_length = len(self.all_camera_transform)
             else:
-                last_trans = cur_trans
-                last_d_timestamp = d_timestamp
+                loop_length = self.all_camera_transform[0][pipeline].size()
+
+            for i in range(loop_length):
+                cur_trans, cur_timestamp = self.read_camera_transform_and_timestamp(pipeline, i)
+                d_timestamp = cur_timestamp - timestamp_image
+                if d_timestamp * last_d_timestamp <= 0:
+                    if not isinstance(last_trans, numpy.ndarray):
+                        last_trans = cur_trans
+                        return cur_trans if abs(d_timestamp) > abs(last_d_timestamp) else last_trans
+                else:
+                    last_trans = cur_trans
+                    last_d_timestamp = d_timestamp
 
         return last_trans
 
@@ -197,32 +199,36 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                         b_read_result = False
 
                     if b_read_result:
-                        self.logger.debug(f'Read objects result form camera {pipeline_name}'
+                        self.logger.debug(f'Read objects result form camera {pipeline_name} '
                                           f'@ image timestamp {timestamp_image}')
                         frame = objects_result[0]
                         subframe = objects_result[1]
                         objects_result_content = objects_result[2]
 
+                        if not isinstance(objects_result_content,
+                                          dict_OutputPortDataType[E_OutputPortDataType.CameraTrack.name][2]):
+                            self.logger.debug(f'Read none data from camera {pipeline_name}')
+                            break
+
                         camera_transform = self.compare_timestamp_get_transform(pipeline_name, timestamp_image)
+                        if isinstance(camera_transform, numpy.ndarray):
+                            self.matchor.camera_transform_dict[pipeline_name] = camera_transform
+                            self.logger.debug(f'Set matchor camera transform from camera {pipeline_name}')
+                        else:
+                            self.logger.debug(f'Get transform from camera {pipeline_name} fail')
+                            break
 
                         if pipeline_name == list(self.port_dict.keys())[0]:
+                            self.matchor.baseline_camera_transform = camera_transform
                             self.matchor.baseline_result = objects_result_content
                             match_result = objects_result_content
                             self.logger.debug(f'Set matchor baseline object result')
-
-                            if isinstance(camera_transform, numpy.ndarray):
-                                self.matchor.baseline_camera_transform = camera_transform
-                                self.matchor.camera_transform_dict[pipeline_name] = camera_transform
-                                self.logger.debug(f'Set matchor baseline camera transform')
-                            else:
-                                self.logger.debug('Get baseline transform fail')
-                                break
 
                         else:
                             match_result = self.matchor.get_match_result(pipeline_name, objects_result_content)
 
                     else:
-                        self.logger.info(f'No camera {pipeline_name} data')
+                        self.logger.debug(f'No camera {pipeline_name} data')
                         if pipeline_name == list(self.port_dict.keys())[0]:
                             break
                         else:
@@ -245,5 +251,5 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                 self.logger.debug(f'No camera transform data')
 
     def run_end(self) -> None:
-        super(MultiCameraIdMatchProcess, self).run_end()
         self.logger.info('-' * 5 + 'Multi Camera Match Finished' + '-' * 5)
+        super(MultiCameraIdMatchProcess, self).run_end()

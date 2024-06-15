@@ -217,7 +217,7 @@ def track(opt_data):
                         opt=opt_data,
                         **pipeline_kwargs,
                     )
-
+                    processor.daemon = True
                     processor.start()
 
                     if pipeline_branch_name == E_pipeline_branch.producer.name:
@@ -247,14 +247,17 @@ def track(opt_data):
     b_check_sub = True
     while b_check_sub:
         b_check_sub = False
-        b_check_producer = False
+
         for pipeline_name, pipeline_branch in pipeline_tree.items():
+            b_check_producer = False
             for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
                 for pipeline_leaf_name, process in pipeline_leaf.items():
                     b_check_sub = b_check_sub or process.is_alive()
                     if pipeline_branch_name == E_pipeline_branch.producer.name:
-                        b_check_producer = b_check_producer or process.is_alive()
-                data_hub.dict_bLoadingFlag[pipeline_name].value = b_check_producer
+                        b_check_producer = b_check_producer or process.recv_alive()
+                        data_hub.dict_bLoadingFlag[pipeline_name].value = b_check_producer
+                        if not b_check_producer:
+                            process.kill()
 
     main_logger.info('-' * 10 + 'Main Finished' + '-' * 10)
 
@@ -273,6 +276,8 @@ if __name__ == '__main__':
     main_logger.info(f'==> cudnn version: {torch.backends.cudnn.version()}')
     main_logger.info('==> Cmd:')
     main_logger.info(str(sys.argv))
+
+    torch.cuda.empty_cache()
 
     if opt.train:
         train(opt)
