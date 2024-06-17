@@ -1,4 +1,4 @@
-from src.multiprocess_pipeline.shared_structure.interface import E_SharedSaveType, E_PipelineSharedDataName,\
+from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_PipelineSharedDataName,\
     E_SharedDataFormat
 from src.multiprocess_pipeline.process.__init__ import ProducerProcess
 

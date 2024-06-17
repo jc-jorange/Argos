@@ -3,7 +3,7 @@ import inspect
 
 from ..CameraTrans import CameraTransProcess_Master
 from src.multiprocess_pipeline.workers.camera_trans_loader import factory_camera_trans_loader, E_CameraTransLoaderName
-from src.multiprocess_pipeline.shared_structure.interface import E_PipelineSharedDataName
+from src.multiprocess_pipeline.shared_structure import E_PipelineSharedDataName
 
 
 class CameraTransLoaderProcess(CameraTransProcess_Master):

@@ -7,7 +7,7 @@ import torch
 
 from ..Image import ImageProcess_Master
 from src.multiprocess_pipeline.workers.image_loader import E_ImageLoaderName, factory_image_loader, BaseImageLoader
-from src.multiprocess_pipeline.shared_structure.interface import E_PipelineSharedDataName
+from src.multiprocess_pipeline.shared_structure import E_PipelineSharedDataName
 
 
 @unique

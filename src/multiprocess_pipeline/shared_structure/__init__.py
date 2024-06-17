@@ -4,10 +4,32 @@ import numpy as np
 import torch
 import math
 from collections import Iterable
+from enum import Enum, unique
 
-from .interface import E_SharedSaveType, E_OutputPortDataType, E_SharedDataFormat
-from .interface import dict_SharedDataInfoFormat
 
+@unique
+class E_SharedSaveType(Enum):
+    Queue = 1
+    Tensor = 2
+    SharedArray_Int = 3
+    SharedArray_Float = 4
+    SharedValue_Int = 5
+    SharedValue_Float = 6
+
+
+
+
+@unique
+class E_OutputPortDataType(Enum):
+    Default = 1
+    CameraTrack = 2
+
+
+@unique
+class E_SharedDataFormat(Enum):
+    data_type = 1
+    data_shape = 2
+    data_value = 3
 
 class Struc_ConsumerOutputPort:
     def __init__(self,
@@ -250,11 +272,13 @@ class Struc_SharedData:
             return 1
 
 
+from src.multiprocess_pipeline.process import factory_process_all
+
+
 class SharedDataHub:
     def __init__(self,
                  device: str,
                  pipeline_cfg: CN):
-        from src.multiprocess_pipeline.process.interface import factory_process_all
 
         self.dict_shared_data = {}
         for pipeline_name, pipeline_branch in pipeline_cfg.items():
@@ -285,3 +309,31 @@ class SharedDataHub:
         self.dict_bLoadingFlag = {
             pipeline_name: mp.Value('b', 1) for pipeline_name in pipeline_cfg.keys()
         }
+
+
+@unique
+class E_PipelineSharedDataName(Enum):
+    ImageData = 1
+    FrameID = 2
+    ImageOriginShape = 3
+    ImageTimestamp = 4
+    CameraTransform = 5
+    TransformTimestamp = 6
+    CamIntrinsicPara = 7
+
+
+
+
+import numpy as np
+
+
+dict_OutputPortDataType = {
+    E_OutputPortDataType.Default.name: any,
+    E_OutputPortDataType.CameraTrack.name: (int, int, np.ndarray),
+}
+
+dict_SharedDataInfoFormat = {
+    E_SharedDataFormat.data_type.name: E_SharedSaveType,
+    E_SharedDataFormat.data_shape.name: tuple,
+    E_SharedDataFormat.data_value.name: any,
+}

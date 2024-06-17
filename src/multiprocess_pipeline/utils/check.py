@@ -1,10 +1,10 @@
 from yacs.config import CfgNode as CN
 
-from src.multiprocess_pipeline.process.interface import E_pipeline_branch
-from src.multiprocess_pipeline.process.interface import factory_process_all
-from src.multiprocess_pipeline.shared_structure.interface import E_PipelineSharedDataName, E_SharedDataFormat, \
+from src.multiprocess_pipeline.process import E_pipeline_branch
+from src.multiprocess_pipeline.process import factory_process_all
+from src.multiprocess_pipeline.shared_structure import E_PipelineSharedDataName, E_SharedDataFormat, \
     E_SharedSaveType
-from src.multiprocess_pipeline.shared_structure.interface import dict_SharedDataInfoFormat
+from src.multiprocess_pipeline.shared_structure import dict_SharedDataInfoFormat
 
 
 def check_pipeline_cfg(cfg_dir: str) -> None:

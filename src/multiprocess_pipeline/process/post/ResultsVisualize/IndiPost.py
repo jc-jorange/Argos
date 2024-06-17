@@ -1,7 +1,7 @@
 import os
 
 from ..ResultsVisualize import ResultsVisualizeProcess_Master
-from src.multiprocess_pipeline.process.interface import E_pipeline_branch
+from src.multiprocess_pipeline.process import E_pipeline_branch
 from src.multiprocess_pipeline.process.producer import E_Process_Producer
 from src.multiprocess_pipeline.workers.postprocess import BasePost
 from src.multiprocess_pipeline.workers.postprocess.result_writer import ImageResultWriter, VideoResultWriter

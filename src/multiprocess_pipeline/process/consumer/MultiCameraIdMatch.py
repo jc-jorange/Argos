@@ -5,9 +5,9 @@ import time
 import numpy
 
 from src.multiprocess_pipeline.process.__init__ import ConsumerProcess
-from src.multiprocess_pipeline.shared_structure.interface import E_SharedSaveType, E_OutputPortDataType, \
+from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_OutputPortDataType, \
     E_PipelineSharedDataName
-from src.multiprocess_pipeline.shared_structure.interface import dict_OutputPortDataType
+from src.multiprocess_pipeline.shared_structure import dict_OutputPortDataType
 from src.multiprocess_pipeline.shared_structure import Struc_SharedData, Struc_ConsumerOutputPort
 from src.multiprocess_pipeline.workers.matchor import factory_matchor
 from src.multiprocess_pipeline.workers.postprocess.utils.write_result import convert_numpy_to_dict

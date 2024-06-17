@@ -9,8 +9,8 @@ from src.multiprocess_pipeline.shared_structure import SharedDataHub, Struc_Shar
 from src.utils.logger import ALL_LoggerContainer, logging
 
 from src.multiprocess_pipeline.process import ProducerProcess, ConsumerProcess, PostProcess
-from src.multiprocess_pipeline.process.interface import E_pipeline_branch
-from src.multiprocess_pipeline.process.interface import factory_process_all
+from src.multiprocess_pipeline.process import E_pipeline_branch
+from src.multiprocess_pipeline.process import factory_process_all
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
