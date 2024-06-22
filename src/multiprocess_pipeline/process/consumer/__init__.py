@@ -1,5 +1,7 @@
 from enum import Enum, unique
 
+from ._masterclass import *
+
 from .Tracker import TrackerProcess
 from .PathPredict import PathPredictProcess
 from .MultiCameraIdMatch import MultiCameraIdMatchProcess
@@ -17,3 +19,9 @@ factory_process_consumer = {
     E_Process_Consumer.PathPredict.name: PathPredictProcess,
     E_Process_Consumer.MultiCameraIdMatch.name: MultiCameraIdMatchProcess,
 }
+
+__all__ = [
+    ConsumerProcess,
+    E_Process_Consumer,
+    factory_process_consumer
+]

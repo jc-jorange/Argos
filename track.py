@@ -1,10 +1,11 @@
 import os
 import sys
 import torch
+import argparse
 import multiprocessing as mp
-from yacs.config import CfgNode as CN
+from yacs.config import CfgNode
 
-from src.opts.track import opts_track, argparse
+from src.opts import opts_track
 from src.multiprocess_pipeline.shared_structure import SharedDataHub, Struc_SharedData
 from src.utils.logger import ALL_LoggerContainer, logging
 
@@ -40,7 +41,7 @@ def track(opt_data: argparse.Namespace,
 
     # Read multiprocess pipeline config file
     with open(opt_data.pipeline_cfg, 'r') as pipeline_cfg:
-        process_yaml = CN.load_cfg(pipeline_cfg)
+        process_yaml = CfgNode.load_cfg(pipeline_cfg)
 
     # Total indi pipeline
     sub_processor_num = len(process_yaml.keys())

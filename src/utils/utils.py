@@ -7,10 +7,6 @@ import torch
 import numpy as np
 
 
-def model_dir_name(module_file: str):
-    return os.path.split(os.path.dirname(module_file))[1]
-
-
 def select_device(gpus: list, apex=False):
     # device = '[-1]' or '[0]' or '[0,1,2,3]'
     gpus_str = ','.join(str(x) for x in gpus)

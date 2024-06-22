@@ -1,6 +1,6 @@
 import argparse
 
-from . import opts
+from ._base_opt import opts
 
 from src.multiprocess_pipeline.utils import check as pipe_check
 

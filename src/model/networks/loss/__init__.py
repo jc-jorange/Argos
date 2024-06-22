@@ -1,16 +1,6 @@
 import torch
-import torch.nn as nn
 
-class BaseModel_loss(nn.Module):
-    def __init__(self, opt, cfg, model_info):
-        super(BaseModel_loss, self).__init__()
-        self.opt = opt
-        self.cfg = cfg
-        self.model_info = model_info
-
-    def forward(self, outputs, batch) -> (torch.Tensor, dict):
-        pass
-
+from ._masterclass import *
 
 from src.model.networks.loss.losses import FocalLoss
 from src.model.networks.loss.losses import RegL1Loss, RegLoss, NormRegL1Loss, RegWeightedL1Loss

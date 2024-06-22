@@ -1,11 +1,6 @@
-import torch.nn as nn
-from src.utils.utils import *
+from enum import Enum, unique
 
-
-class BaseModel_backbone(nn.Module):
-    def __init__(self, **kwargs):
-        super(BaseModel_backbone, self).__init__()
-
+from ._masterclass import BaseModel_backbone
 
 from .CSP_Custom import custom_csp
 from .EfficientNet_Lite import efficientnet_lite
@@ -19,16 +14,32 @@ from .ParNet_Mod import ParNet_Mod
 from .DLA import dla
 from .EfficientNet import EfficientNet
 
+
+@unique
+class E_BackboneName(Enum):
+    CSP_Custom = 1
+    EfficientNet_Lite = 2
+    GhostNet = 3
+    MobileNet_V2 = 4
+    RepVGG = 5
+    ResNet = 6
+    ShuffleNetV2 = 7
+    ParNet = 8
+    ParNet_Mod = 9
+    DLA = 10
+    EfficientNet = 11
+
+
 backbone_factory_ = {
-    model_dir_name(custom_csp.__file__): custom_csp.CustomCspNet,
-    model_dir_name(efficientnet_lite.__file__): efficientnet_lite.EfficientNetLite,
-    model_dir_name(ghostnet.__file__): ghostnet.GhostNet,
-    model_dir_name(mobilenetv2.__file__): mobilenetv2.MobileNetV2,
-    model_dir_name(repvgg.__file__): repvgg.RepVGG,
-    model_dir_name(resnet.__file__): resnet.ResNet,
-    model_dir_name(shufflenetv2.__file__): shufflenetv2.ShuffleNetV2,
-    model_dir_name(ParNet.__file__): ParNet.ParNet,
-    model_dir_name(ParNet_Mod.__file__): ParNet_Mod.ParNet_Mod,
-    model_dir_name(dla.__file__): dla.DLA,
-    model_dir_name(EfficientNet.__file__): EfficientNet.EfficientNet.from_pretrained,
+    E_BackboneName.CSP_Custom.name: custom_csp.CustomCspNet,
+    E_BackboneName.EfficientNet_Lite.name: efficientnet_lite.EfficientNetLite,
+    E_BackboneName.GhostNet.name: ghostnet.GhostNet,
+    E_BackboneName.MobileNet_V2.name: mobilenetv2.MobileNetV2,
+    E_BackboneName.RepVGG.name: repvgg.RepVGG,
+    E_BackboneName.ResNet.name: resnet.ResNet,
+    E_BackboneName.ShuffleNetV2.name: shufflenetv2.ShuffleNetV2,
+    E_BackboneName.ParNet.name: ParNet.ParNet,
+    E_BackboneName.ParNet_Mod.name: ParNet_Mod.ParNet_Mod,
+    E_BackboneName.DLA.name: dla.DLA,
+    E_BackboneName.EfficientNet.name: EfficientNet.EfficientNet.from_pretrained,
 }

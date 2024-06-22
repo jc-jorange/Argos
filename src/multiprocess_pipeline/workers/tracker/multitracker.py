@@ -2,17 +2,18 @@ from collections import deque, defaultdict
 import multiprocessing as mp
 
 from src.utils.logger import ALL_LoggerContainer
-from src.model import BaseModel, load_model
-from src.model.decode import mot_decode
+from src.model.base_model import BaseModel, load_model
+from src.model.utils.decode import mot_decode
 from src.model.utils import _tranpose_and_gather_feat
 from src.model.model_config import E_model_part_input_info, E_arch_position
 from src.multiprocess_pipeline.workers.tracker import matching
 from src.multiprocess_pipeline.workers.tracker.utils.kalman_filter import KalmanFilter
 from src.multiprocess_pipeline.workers.tracker.utils.utils import *
 from src.utils.post_process import ctdet_post_process
-from .__init__ import MCBaseTrack, TrackState
+from ._masterclass import MCBaseTrack, TrackState
 
 import datetime
+
 
 class MCTrack(MCBaseTrack):
     shared_kalman = KalmanFilter()

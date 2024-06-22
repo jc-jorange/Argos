@@ -9,9 +9,9 @@ from torchvision.transforms import transforms as trs
 from src.opts.train import opts_train, argparse
 from src.utils.logger import ALL_LoggerContainer, logging
 
-from src.model import load_model, save_model, BaseModel
-from src.dataset import TrainingDataset
-from src.trainer import BaseTrainer
+from src.model.base_model import load_model, save_model, BaseModel
+from src.dataset.dataset import TrainingDataset
+from src.trainer.trainer import BaseTrainer
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 

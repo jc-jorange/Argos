@@ -1,12 +1,6 @@
-import torch.nn as nn
-from src.utils.utils import *
+from enum import Enum, unique
 
-
-class BaseModel_neck(nn.Module):
-    def __init__(self, input_dim=(64, 128, 256), **kwargs):
-        self.input_dim = input_dim
-        super(BaseModel_neck, self).__init__()
-
+from ._masterclass import *
 
 from .FPN import fpn
 from .Ghost_PAN import ghost_pan
@@ -14,10 +8,20 @@ from .PAN import pan
 from .TAN import tan
 from .DLA_Fusion import dla_fusion
 
+
+@unique
+class E_NeckName(Enum):
+    FPN = 1
+    Ghost_PAN = 2
+    PAN = 3
+    TAN = 4
+    DLA_Fusion = 5
+
+
 neck_factory_ = {
-    model_dir_name(fpn.__file__): fpn.FPN,
-    model_dir_name(ghost_pan.__file__): ghost_pan.GhostPAN,
-    model_dir_name(pan.__file__): pan.PAN,
-    model_dir_name(fpn.__file__): tan.TAN,
-    model_dir_name(dla_fusion.__file__): dla_fusion.DLA_Fusion,
+    E_NeckName.FPN.name: fpn.FPN,
+    E_NeckName.Ghost_PAN.name: ghost_pan.GhostPAN,
+    E_NeckName.PAN.name: pan.PAN,
+    E_NeckName.TAN.name: tan.TAN,
+    E_NeckName.DLA_Fusion.name: dla_fusion.DLA_Fusion,
 }

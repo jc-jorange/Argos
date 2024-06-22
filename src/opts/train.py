@@ -1,6 +1,6 @@
 import argparse
 
-from . import opts
+from ._base_opt import opts
 
 from src.trainer.utils import check as train_check
 

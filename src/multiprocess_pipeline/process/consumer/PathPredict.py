@@ -2,7 +2,7 @@ import time
 from multiprocessing import queues
 from collections import defaultdict
 
-from src.multiprocess_pipeline.process import ConsumerProcess
+from . import ConsumerProcess
 from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_OutputPortDataType
 from src.multiprocess_pipeline.workers.predictor import factory_predictor
 from src.multiprocess_pipeline.workers.postprocess.utils import write_result as wr

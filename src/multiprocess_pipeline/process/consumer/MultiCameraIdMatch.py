@@ -4,7 +4,7 @@ import os
 import time
 import numpy
 
-from src.multiprocess_pipeline.process.__init__ import ConsumerProcess
+from . import ConsumerProcess
 from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_OutputPortDataType, \
     E_PipelineSharedDataName
 from src.multiprocess_pipeline.shared_structure import dict_OutputPortDataType

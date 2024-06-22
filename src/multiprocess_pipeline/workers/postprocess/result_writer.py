@@ -3,7 +3,7 @@ import glob
 import cv2
 from collections import defaultdict
 
-from src.multiprocess_pipeline.workers.postprocess import BasePost
+from ._masterclass import BasePost
 from src.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
 
 

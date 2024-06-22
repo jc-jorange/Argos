@@ -1,8 +1,9 @@
-from yacs.config import CfgNode as CN
-from .networks.model_part_config import model_part_cfg_master as part_cfg
-from .networks.model_part_config import E_model_part_info
+from yacs.config import CfgNode
 from enum import Enum, unique
 import os
+
+from .networks.model_part_config import model_part_cfg_master as part_cfg
+from .networks.model_part_config import E_model_part_info
 
 
 @unique
@@ -37,44 +38,44 @@ model_arch_dict = {k: part_cfg for k in E_arch_position.__members__}
 model_info_save_dict = {k.name: v for k, v in model_general_info_default_dict.items()}
 model_info_save_dict.update(model_arch_dict)
 
-model_cfg_master = CN(model_info_save_dict)
+model_cfg_master = CfgNode(model_info_save_dict)
 
 
-def check_model_architecture(cfg: CN):
-    bHaveHead = False
-    bHaveBackbone_with_Neck = False
-    bHaveBackbone = False
-    bHaveNeck = False
+def check_model_architecture(cfg: CfgNode):
+    b_have_head = False
+    b_have_backbone_with_neck = False
+    b_have_backbone = False
+    b_have_neck = False
 
     for k, v in cfg.items():
         model_name = ''
         if k in E_arch_position.__members__.keys():
             model_name = v[E_model_part_info(1).name]
         if k == E_arch_position.head.name and model_name != '':
-            bHaveHead = True
+            b_have_head = True
         elif k == E_arch_position.backbone_with_neck.name and model_name != '':
-            bHaveBackbone_with_Neck = True
+            b_have_backbone_with_neck = True
         elif k == E_arch_position.backbone.name and model_name != '':
-            bHaveBackbone = True
+            b_have_backbone = True
         elif k == E_arch_position.neck.name and model_name != '':
-            bHaveNeck = True
+            b_have_neck = True
 
     arch_list = []  # Order of this list is important
-    if not bHaveBackbone_with_Neck:
-        if not bHaveBackbone:
+    if not b_have_backbone_with_neck:
+        if not b_have_backbone:
             raise AttributeError('Model lacks backbone!')
         else:
             arch_list.append(E_arch_position(2).name)
-            if not bHaveNeck:
+            if not b_have_neck:
                 raise AttributeError('Model only has backbone, lacks neck!')
             else:
                 arch_list.append(E_arch_position(3).name)
     else:
         arch_list.append(E_arch_position(1).name)
-        if bHaveBackbone or bHaveNeck:
+        if b_have_backbone or b_have_neck:
             raise AttributeError('Model had both backbone+neck, backbone or neck! Too many parts!')
 
-    if not bHaveHead:
+    if not b_have_head:
         raise AttributeError('Model lacks head!')
     else:
         arch_list.append(E_arch_position(0).name)

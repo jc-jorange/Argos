@@ -1,4 +1,4 @@
-from yacs.config import CfgNode as CN
+from yacs.config import CfgNode
 
 from src.multiprocess_pipeline.process import E_pipeline_branch
 from src.multiprocess_pipeline.process import factory_process_all
@@ -10,7 +10,7 @@ from src.multiprocess_pipeline.shared_structure import dict_SharedDataInfoFormat
 def check_pipeline_cfg(cfg_dir: str) -> None:
     print(f'start checking config {cfg_dir}')
     with open(cfg_dir, 'r') as pipeline_cfg:
-        process_yaml = CN.load_cfg(pipeline_cfg)
+        process_yaml = CfgNode.load_cfg(pipeline_cfg)
 
         for pipeline_name, pipeline in process_yaml.items():
             for pipeline_branch_name, pipeline_branch in pipeline.items():

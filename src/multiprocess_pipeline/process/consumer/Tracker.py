@@ -1,10 +1,9 @@
 import numpy
 from enum import Enum, unique
-import multiprocessing
 
 from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_OutputPortDataType,\
     E_PipelineSharedDataName
-from src.multiprocess_pipeline.process import ConsumerProcess
+from . import ConsumerProcess
 from src.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker
 from src.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
 from src.multiprocess_pipeline.workers.tracker.utils.timer import Timer
