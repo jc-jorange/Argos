@@ -172,7 +172,7 @@ src
     ...   
     ```
     - `cfg`: store model configure file. Configure contents are this part model initial structure key arguments. In this example, we have one configure `default.yml`. In this example, configure content as following:
-    ```ymal
+    ```yaml
     head_conv: 256
     reid_dim: 128
     loss_cfg:
@@ -252,7 +252,7 @@ For example, process `ImgaLoader` can have worker `loader_address` load image fr
           IndiResultsVisual:
             output_format: video
 
-        static_shared_value:s
+        static_shared_value:
           CamIntrinsicPara:
             data_type: SharedArray_Float
             data_shape: [ 3, 4 ]
