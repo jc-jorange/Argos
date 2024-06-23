@@ -7,7 +7,9 @@ pandas
 progress
 PyYAML
 scipy
+
+protobuf==3.19.0
 tensorboardX
+
 opencv-python
 yacs
-openmim

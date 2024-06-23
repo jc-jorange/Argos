@@ -17,11 +17,12 @@ class opts(object):
 
         # basic experiment setting
         self.parser.add_argument('--exp_id',
-                                 default='custom')
+                                 default='custom',
+                                 help='ID/name for this experiment')
 
         self.parser.add_argument('--debug',
                                  action='store_true',
-                                 help='enable log debug mode')
+                                 help='store in true, enable log debug mode')
 
         self.parser.add_argument('--output_root',
                                  type=str,
@@ -41,7 +42,7 @@ class opts(object):
 
         # model: backbone and so on...
         self.parser.add_argument('--arch_cfg_path',
-                                 default='src/model/cfg',
+                                 default='./src/model/cfg',
                                  help='model total-all config yaml path')
         self.parser.add_argument('--model_part_path',
                                  default='./src/model/networks',

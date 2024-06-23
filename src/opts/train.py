@@ -7,13 +7,13 @@ from src.trainer.utils import check as train_check
 
 class opts_train(opts):
     def __init__(self):
-        super(opts, self).__init__()
+        super(opts_train, self).__init__()
         self.parser: argparse.ArgumentParser
 
         # basic experiment setting
         self.parser.add_argument('--resume',
                                  action='store_true',
-                                 help='resume an experiment. '
+                                 help='store in true, resume an experiment. '
                                       'Reloaded the optimizer parameter and '
                                       'set load_model to model_last.pth '
                                       'in the exp dir if load_model is empty.')
@@ -25,21 +25,24 @@ class opts_train(opts):
                                  help='dataloader threads. 0 for single-thread.')
         self.parser.add_argument('--not_cuda_benchmark',
                                  action='store_true',
-                                 help='disable when the input size is not fixed.')
+                                 help='store in true, disable when the input size is not fixed.')
         self.parser.add_argument('--gen_multi_scale',
                                  action='store_true',
-                                 help='Whether to generate multi-scales')
+                                 help='store in true, Whether to generate multi-scales')
 
         # model: backbone and so on...
         self.parser.add_argument('--arch',
-                                 default='NanoDet_mot',
+                                 default='',
                                  help='model architecture. As model config file name')
-
-        # train
         self.parser.add_argument('--data_cfg',
                                  type=str,
-                                 default='./src/dataset/cfg/custom.json',
+                                 default='',
                                  help='load data from cfg')
+        self.parser.add_argument('--load_model',
+                                 type=str,
+                                 default='',
+                                 help='load from trained checkpoint')
+
         self.parser.add_argument('--lr',
                                  type=float,
                                  default=1e-4,  # 1e-4, 7e-5, 5e-5, 3e-5

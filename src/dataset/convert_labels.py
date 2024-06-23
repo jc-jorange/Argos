@@ -1,11 +1,9 @@
 import os
-import glob
 import cv2
 
 
-def gen_VisDrone2019_label():
-    root = '/media/jc/Extend/Library/Dataset/'
-    data_dir = 'VisDrone2019-MOT/images/VisDrone2019-MOT-train/sequences'
+def gen_VisDrone2019_label(root: str,
+                           data_dir: str):
     real_data_dir = os.path.join(root, data_dir)
     gt_dir = real_data_dir.replace('sequences', 'annotations')
     gt_save_dir = real_data_dir.replace('images', 'labels_with_ids')
@@ -35,19 +33,20 @@ def gen_VisDrone2019_label():
                     gt_tmp = [category, tid, str(center_x), str(center_y), str(w), str(h)]
                     gt = ' '.join(gt_tmp) + '\n'
 
-                    with open(os.path.join(gt_sequence + '/%s.txt' % frame), 'a') as gt_f:
+                    with open(os.path.join(gt_sequence + f'{frame}.txt'), 'a') as gt_f:
                         gt_f.writelines(gt)
 
     for sequence in os.listdir(real_data_dir):
         for file in os.listdir(os.path.join(real_data_dir, sequence)):
             file_name = file.split('.')[0]
-            new_gt = os.path.join(gt_save_dir, sequence)+'/%s.txt'%file_name
+            new_gt = os.path.join(gt_save_dir, sequence, f'{file_name}.txt')
             if not os.path.exists(new_gt):
                 with open(new_gt, 'w') as f:
                     pass
 
 
-def gen_KITTI_Tracking2D_label():
+def gen_KITTI_Tracking2D_label(root: str,
+                               data_dir: str):
     category_map = {
         'DontCare': -1,
         'Car': 0,
@@ -59,8 +58,7 @@ def gen_KITTI_Tracking2D_label():
         'Tram': 6,
         'Misc': 7,
     }
-    root = '/media/jc/Extend/Library/Dataset/'
-    data_dir = 'KITTI_Object_Tracking_Evaluation/images/training/image_02'
+
     real_data_dir = os.path.join(root, data_dir)
     gt_dir = real_data_dir.replace('image_02', 'label_02')
     gt_save_dir = real_data_dir.replace('images', 'labels_with_ids')
@@ -108,5 +106,10 @@ def gen_KITTI_Tracking2D_label():
                 with open(new_gt, 'w') as f:
                     pass
 
+
 if __name__ == '__main__':
-    gen_VisDrone2019_label()
+    gen_VisDrone2019_label(root='/media/jc/Extend/Library/Dataset/',
+                           data_dir='VisDrone2019-MOT/images/VisDrone2019-MOT-train/sequences')
+
+    gen_KITTI_Tracking2D_label(root='/media/jc/Extend/Library/Dataset/',
+                               data_dir='KITTI_Object_Tracking_Evaluation/images/training/image_02')

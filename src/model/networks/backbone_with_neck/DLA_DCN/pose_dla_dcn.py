@@ -307,7 +307,6 @@ class DLA(nn.Module):
             self.channels[-1], num_classes,
             kernel_size=1, stride=1, padding=0, bias=True)
         total = sum([param.nelement() for param in self.fc.parameters()])
-        print("fc : %d" % (total))
         self.load_state_dict(model_weights)
         # self.fc = fc
 
