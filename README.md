@@ -171,7 +171,25 @@ src
     │    └─── __init__.py
     ...   
     ```
-    - `cfg`: store model configure file. Configure contents are this part model initial structure key arguments. In this example, we have one configure `default.yml`.
+    - `cfg`: store model configure file. Configure contents are this part model initial structure key arguments. In this example, we have one configure `default.yml`. In this example, configure content as following:
+    ```ymal
+    head_conv: 256
+    reid_dim: 128
+    loss_cfg:
+      mse_loss: false
+      reg_loss: 'l1'
+      hm_weight: 1
+      off_weight: 1
+      wh_weight: 0.1
+      id_loss: 'ce'
+      id_weight: 1
+      norm_wh: false
+      dense_wh: false
+      cat_spec_wh: false
+      reg_offset: true
+
+      loss_stats: ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']
+    ```
     - `[model name].py`: model python file. In this example, we use `FairMOT.py` model.
     - `_masterclass.py`: define the base model of this part.
     - `__init__.py`: all usable networks in this part should be registered in this file to use.
