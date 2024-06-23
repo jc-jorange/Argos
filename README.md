@@ -273,33 +273,33 @@ In this project, we use a multiprocess based configurable pipeline system for an
     An example pipeline system configure `TestFunc.yml` as following:
     ``` yaml
     FuncTest_1:
-        producer:
-            ImageLoader:
-                image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
-                loader: Video
-                normalized_image_shape: [ 3, 608, 1088 ]
+      producer:
+        ImageLoader:
+          image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
+          loader: Video
+          normalized_image_shape: [ 3, 608, 1088 ]
 
-        consumer:
-              Track:
-                arch: DLA+GhostPAN_mot_8class
-                load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
-                conf_thres: 0.4
-                track_buffer: 30
+      consumer:
+        Track:
+          arch: DLA+GhostPAN_mot_8class
+          load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+          conf_thres: 0.4
+          track_buffer: 30
 
-            PathPredict:
-                predictor_name: HermiteSpline
+        PathPredict:
+          predictor_name: HermiteSpline
 
-        post:
-            IndiResultsVisual:
-                output_format: video
+      post:
+        IndiResultsVisual:
+          output_format: video
 
-        static_shared_value:
-            CamIntrinsicPara:
-                data_type: SharedArray_Float
-                data_shape: [ 3, 4 ]
-                data_value: [ [ 11.11, 0., 128.0, 0 ],
-                              [ 0, 11.11, 128.0, 0 ],
-                              [ 0, 0, 1.0000, 0 ] ]
+      static_shared_value:
+        CamIntrinsicPara:
+          data_type: SharedArray_Float
+          data_shape: [ 3, 4 ]
+          data_value: [ [ 11.11, 0., 128.0, 0 ],
+                        [ 0, 11.11, 128.0, 0 ],
+                        [ 0, 0, 1.0000, 0 ] ]
     ```
     - First hierarchy is the pipeline name, here is `FuncTest_1`.
     - `producer` contain all producer processes and their own arguments, here we have `ImageLoader`.
