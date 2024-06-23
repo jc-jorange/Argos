@@ -28,23 +28,15 @@ A Multiple Camera Multiple Object Tracking System.
       ```
       pip install cython
       pip install -r requirements.txt
-      mim install mmcv  # Use mmcv for DCNv2
+      pip install "mmcv>=2.0.0rc1" -f xxxx  # Use mmcv for DCNv2 from https://github.com/open-mmlab/mmcv/blob/master/docs/en/compatibility.md
       ```
 
-## Usage
-- Tracking:
-    ```
-    python track.py --exp_id Test --pipeline_cfg ./src/multiprocess_pipeline/cfg/TestFunc.yml
-    ```
-    here:  
-    `--exp_id` as experiment name for example here I use `Test`;  
-    `--pipeline_cfg` as pipeline config file path.  
-    
-    More arguments details please see in `./src/opts/track.py`. 
-  
-## Training
 
 ## Project Structure
+Optional content. Highly recommend read this before development.
+<details>
+
+<summary>Structure directory</summary>
 The whole project is based on a multiprocessing pipeline system, which can be easily configured in *YAML* format.
 Project structure as following:
 
@@ -63,25 +55,27 @@ src
 └─── opts
 ```
 
-  - **Dataset**
+  - ### Dataset
 
     All dataset related is in `dataset` directory. Substructure as following:
 
     ```
     dataset
     ├─── cfg
-    ├─── convert
     ├─── data_path
+    ├─── convert_labels.py
+    ├─── gen_data_path.py
     └─── dataset.py
     ```
     
     - `cfg`: Store dataset config file by *JSON*.
-    - `convert`: Contain all utils to convert dataset format to *MOT Challenge*.
     - `data_path`: Store image file paths by specialized file type.
+    - `convert_labels.py`: Contain all utils to convert dataset format to [MOT Challenge](https://motchallenge.net/) format.
+    - `gen_data_path.py`: Generate dataset image file container file.
     - `dataset.py`: All dataset class defined in this file.
 
 
-  - **Trainer**
+  - ### Trainer
 
     `trainer` defined basic trainer class for network training. Substructure as following:
     ```
@@ -94,7 +88,7 @@ src
     - `trainer.py`: defined all trainers.
 
 
-  - **Model**
+  - ### Model
 
     `model` contain all network related content. 
     We use a simple swappable module system to develop tracking networks. 
@@ -182,10 +176,10 @@ src
     - `_masterclass.py`: define the base model of this part.
     - `__init__.py`: all usable networks in this part should be registered in this file to use.
 
-  - **Multiprocess Pipeline**
+  - ### Multiprocess Pipeline
     
     `multiprocess_pipeline` contain all multiprocess pipeline related contents. In this project, we use a multiprocess based configurable pipeline system for tracking implement. 
-    System configure files stored in `multiprocess_pipeline/cfg`.
+    You can find example system configure files in `multiprocess_pipeline/cfg`.
 
     Substructure as following:
     ```
@@ -256,7 +250,7 @@ For example, process `ImgaLoader` can have worker `loader_address` load image fr
       - `static_shared_value`: for some initial static shared values in this pipeline, here we initialize `CamIntrinsicPara` as camera intrinsic matrix. 
       Check `dict_SharedDataInfoFormat` in `multiprocess_pipeline/shared_structure/__init__.py` for shared value initialize format.
 
-  - **Parser for command-line options**
+  - ### Parser for command-line options
     
     `opts` handles all the command-line input options or arguments for each experiment. Substructure as following:
     ```
@@ -269,3 +263,138 @@ For example, process `ImgaLoader` can have worker `loader_address` load image fr
 
     Currently, only 2 optional subclass `opt_track` and `opt_train` are used in this project for multi-object tracking and neural network training respectively.
 
+</details>
+
+## Inference
+In this project, we use a multiprocess based configurable pipeline system for any implement. You can find example system configure files in `./src/multiprocess_pipeline/cfg`.
+
+- Example:
+
+    An example pipeline system configure `TestFunc.yml` as following:
+    ``` yaml
+    FuncTest_1:
+        producer:
+            ImageLoader:
+                image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
+                loader: Video
+                normalized_image_shape: [ 3, 608, 1088 ]
+
+        consumer:
+              Track:
+                arch: DLA+GhostPAN_mot_8class
+                load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+                conf_thres: 0.4
+                track_buffer: 30
+
+            PathPredict:
+                predictor_name: HermiteSpline
+
+        post:
+            IndiResultsVisual:
+                output_format: video
+
+        static_shared_value:
+            CamIntrinsicPara:
+                data_type: SharedArray_Float
+                data_shape: [ 3, 4 ]
+                data_value: [ [ 11.11, 0., 128.0, 0 ],
+                              [ 0, 11.11, 128.0, 0 ],
+                              [ 0, 0, 1.0000, 0 ] ]
+    ```
+    - First hierarchy is the pipeline name, here is `FuncTest_1`.
+    - `producer` contain all producer processes and their own arguments, here we have `ImageLoader`.
+    - `consumer` contain all consumer processes and their own arguments, here we have `Track` and `PathPredict`.
+    - `post` contain all post processes and their own arguments, here we have `IndiResultsVisual`.
+    - All processes are from `multiprocess_pipeline/process`. Check each category `__init__.py` file for process name.
+    - `static_shared_value`: for some initial static shared values in this pipeline, here we initialize `CamIntrinsicPara` as camera intrinsic matrix. 
+    Check `dict_SharedDataInfoFormat` in `multiprocess_pipeline/shared_structure/__init__.py` for shared value initialize format.
+
+- ### Tracking
+  ```
+  python track.py --exp_id Test --pipeline_cfg ./src/multiprocess_pipeline/cfg/TestFunc.yml
+  ```
+  here:
+  - `--exp_id` as experiment name for example here I use `Test`;  
+  - `--pipeline_cfg` as pipeline config file path.  
+
+  More arguments details please see in `./src/opts/track.py` or run `python track.py -h` list all arguments. 
+
+
+## Dataset
+- ### Format:
+    We use the [MOT Challenge](https://motchallenge.net/) format and directory structure as training label format, details as following:
+    - label format:
+      ```
+      class id x_center/img_width y_center/img_height w/img_width h/img_height
+      ```
+    - directory structure example:
+      ```
+      [Dataset name]
+      ├─── images
+      │    └─── [any sub directories hierarchy]
+      │         ├─── [sequence name]
+      │         │    ├─── 0000_0001.png
+      │         │    ├─── 0000_0002.png
+      │         │    └─── ...
+      │         └─── ...
+      └─── labels_with_ids
+           └─── [same sub directories hierarchy as 'images']
+                ├─── [sequence name]
+                │    ├─── 0000_0001.txt
+                │    ├─── 0000_0002.txt
+                │    └─── ...
+                └─── ...
+      ```
+    You can directly use MOT17 or MOT20 dataset for training.
+    We provide a convert tool `./src/dataset/convert_labels.py` to convert [KITTI Tracking](https://www.cvlibs.net/datasets/kitti/eval_tracking.php)
+    or [VisDrone2019](https://github.com/VisDrone/VisDrone-Dataset?tab=readme-ov-file) to MOT format.
+
+- ### Dataset Preparation
+    1. Make sure your dataset format and directory structure is in MOT Challenge format.
+    2. Generate image paths container file by tool `./src/dataset/gen_data_path.py`. 
+    3. Create a json file for this dataset. You need to specify the "root" and "train" keys in the json file. You can find some examples in `./src/dataset/cfg`.
+
+
+## Training
+- ### Model
+    We use a simple swappable module system to develop tracking networks. All model configure files are default in `./src/model/cfg`.
+    
+    Here is an example model configure file `DLA+GhostPAN_mot_8class.yml`:
+    ``` yaml
+    _description: ''
+    backbone:
+      _description: ''
+      cfg_name: default
+      model_name: DLA
+    backbone_with_neck:
+      _description: ''
+      cfg_name: ''
+      model_name: ''
+    neck:
+      _description: ''
+      cfg_name: default
+      model_name: Ghost_PAN
+    head:
+      _description: ''
+      cfg_name: default
+      model_name: FairMOT
+    max_classes_num: 8
+    max_objects_num: 500
+    ```
+    - `_description`: human-readable additional information.
+    - `model_name`: model part name.
+    - `cfg_name`: the part configure file name used for this model part.
+    - `max_classes_num`: max tracking object categories in this model.
+    - `max_objects_num`: max tracking object amounts for each category in this model. 
+
+- ### Train
+    Please make sure you have finished <big>**Dataset Preparation**</big> and <big>**Model Configure**</big> before training.
+    ```
+    python train.py --exp_id Train_Test --arch DLA34_mot_8class --data_cfg ./src/dataset/cfg/FunTest.json
+    ```
+    here:
+    - `--exp_id` as experiment name for example here I use `Train_Test`;  
+    - `--arch` as model configure file name in model configure directory, which is defined by `--arch_cfg_path` in *_base_opt* or manually input with command line;  
+    - `--data_cfg` as dataset configure json file;
+
+    More arguments details please see in `./src/opts/train.py` or run `python train.py -h` list all arguments. 
