@@ -10,7 +10,7 @@ from src.multiprocess_pipeline.workers.tracker.utils.utils import *
 
 
 class PathPredictProcess(ConsumerProcess):
-    prefix = 'Argus-SubProcess-PathPredictProcess_'
+    prefix = 'Argos-SubProcess-PathPredictProcess_'
     dir_name = 'predict'
     log_name = 'Path_Predict_Log'
     save_type = [wr.E_text_result_type.raw]

@@ -17,7 +17,7 @@ class EImageInfo(Enum):
 
 
 class ImageLoaderProcess(ProducerProcess):
-    prefix = 'Argus-SubProcess-ImageLoader_'
+    prefix = 'Argos-SubProcess-ImageLoader_'
     dir_name = 'image_input'
     log_name = 'Image_Loader_Log'
 

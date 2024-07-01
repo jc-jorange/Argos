@@ -7,7 +7,7 @@ from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_Pipel
 
 
 class CameraTransLoaderProcess(ProducerProcess):
-    prefix = 'Argus-SubProcess-CameraTransLoader_'
+    prefix = 'Argos-SubProcess-CameraTransLoader_'
     dir_name = 'camera_trans_input'
     log_name = 'Camera_Trans_Loader_Log'
 

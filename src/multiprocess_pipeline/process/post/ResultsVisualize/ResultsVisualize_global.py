@@ -9,7 +9,7 @@ import src.multiprocess_pipeline.workers.postprocess.utils.write_result as wr
 
 
 class GloResultsVisualizeProcess(PostProcess):
-    prefix = 'Argus-SubProcess-GlobalPostProcess_'
+    prefix = 'Argos-SubProcess-GlobalPostProcess_'
     dir_name = 'global_post'
     log_name = 'Global_Post_Log'
 

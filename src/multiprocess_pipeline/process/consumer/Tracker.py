@@ -17,7 +17,7 @@ class ETrackInfo(Enum):
 
 
 class TrackerProcess(ConsumerProcess):
-    prefix = 'Argus-SubProcess-Tracker_'
+    prefix = 'Argos-SubProcess-Tracker_'
     dir_name = 'track'
     log_name = 'Track_Log'
     save_type = [wr.E_text_result_type.raw, wr.E_text_result_type.mot]

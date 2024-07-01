@@ -15,8 +15,8 @@ from src.trainer.trainer import BaseTrainer
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
-MAIN_PROCESS_NAME = 'Argus-MainTrainProcess'
-TENSORBOARD_WRITER_NAME = 'Argus-Train-TensorboardWriter'
+MAIN_PROCESS_NAME = 'Argos-MainTrainProcess'
+TENSORBOARD_WRITER_NAME = 'Argos-Train-TensorboardWriter'
 
 
 def train(opt_data: argparse.Namespace,

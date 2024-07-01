@@ -15,7 +15,7 @@ from src.multiprocess_pipeline.process import factory_process_all
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
-MAIN_PROCESS_NAME = 'Argus-MainTrackProcess'
+MAIN_PROCESS_NAME = 'Argos-MainTrackProcess'
 
 
 def track(opt_data: argparse.Namespace,

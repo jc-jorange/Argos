@@ -15,7 +15,7 @@ from src.multiprocess_pipeline.workers.postprocess.utils import write_result as 
 
 
 class MultiCameraIdMatchProcess(ConsumerProcess):
-    prefix = 'Argus-SubProcess-Global_ID_Match_'
+    prefix = 'Argos-SubProcess-Global_ID_Match_'
     dir_name = 'id_match'
     log_name = 'ID_Match_Log'
     save_type = [wr.E_text_result_type.raw]

@@ -9,7 +9,7 @@ import src.multiprocess_pipeline.workers.postprocess.utils.write_result as wr
 
 
 class IndiResultsVisualizeProcess(PostProcess):
-    prefix = 'Argus-SubProcess-IndiPostProcess_'
+    prefix = 'Argos-SubProcess-IndiPostProcess_'
     dir_name = 'indi_post'
     log_name = 'Indi_Post_Log'
 
