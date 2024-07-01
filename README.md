@@ -416,3 +416,6 @@ In this project, we use a multiprocess based configurable pipeline system for an
     - `--data_cfg` as dataset configure json file;
 
     More arguments details please see in `./src/opts/train.py` or run `python train.py -h` list all arguments. 
+
+## Acknowledgement
+This research some parts are based on [FairMOT](https://github.com/ifzhang/FairMOT/), [MCMOT](https://github.com/CaptainEven/MCMOT) and [Nanodet](https://github.com/RangiLyu/nanodet). Thanks for their wonderful works.
