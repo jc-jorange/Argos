@@ -13,7 +13,7 @@ A Multiple Camera Multiple Object Tracking System.
 
   1. Clone this repository.
       ```
-      git clone 
+      git clone https://github.com/Namiki-Laboaratory/Argos.git
       ```
 
   2. Setup environment.  
