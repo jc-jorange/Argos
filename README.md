@@ -198,6 +198,9 @@ src
     
     `multiprocess_pipeline` contain all multiprocess pipeline related contents. In this project, we use a multiprocess based configurable pipeline system for tracking implement. 
     You can find example system configure files in `multiprocess_pipeline/cfg`.
+    
+    Example concept as following figure:
+    ![Pipeline_Structure](/doc/img/Pipeline_Structure.png)
 
     Substructure as following:
     ```
