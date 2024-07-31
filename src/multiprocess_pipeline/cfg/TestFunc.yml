@@ -1,14 +1,14 @@
 FuncTest_1:
   producer:
     ImageLoader:
-      image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
+      image_path: "/media/jc/Extend/Output/OpenShot/Old/Test_04.mp4"
       loader: Video
       normalized_image_shape: [ 3, 608, 1088 ]
 
   consumer:
     Track:
-      arch: DLA+GhostPAN_mot_8class
-      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+      arch: DLA34_mot_8class
+      load_model: /home/jc/PythonScripts/Argos/results/train_result/RealWorldExperiment/2024-07-22-16-16-02/DLA34_mot_8class.pth
       conf_thres: 0.4
       track_buffer: 30
 
@@ -27,34 +27,34 @@ FuncTest_1:
                    [ 0, 11.11, 128.0, 0 ],
                    [ 0, 0, 1.0000, 0 ] ]
 
-FuncTest_2:
-  producer:
-    ImageLoader:
-      image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
-      loader: Video
-      normalized_image_shape: [ 3, 608, 1088 ]
-
-  consumer:
-    Track:
-      arch: DLA+GhostPAN_mot_8class
-      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
-      conf_thres: 0.4
-      track_buffer: 30
-
-    PathPredict:
-      predictor_name: HermiteSpline
-
-  post:
-    IndiResultsVisual:
-      output_format: video
-
-  static_shared_value:
-    CamIntrinsicPara:
-      data_type: SharedArray_Float
-      data_shape: [ 3, 4 ]
-      data_value: [ [ 11.11, 0., 128.0, 0 ],
-                   [ 0, 11.11, 128.0, 0 ],
-                   [ 0, 0, 1.0000, 0 ] ]
+#FuncTest_2:
+#  producer:
+#    ImageLoader:
+#      image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
+#      loader: Video
+#      normalized_image_shape: [ 3, 608, 1088 ]
+#
+#  consumer:
+#    Track:
+#      arch: DLA+GhostPAN_mot_8class
+#      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+#      conf_thres: 0.4
+#      track_buffer: 30
+#
+#    PathPredict:
+#      predictor_name: HermiteSpline
+#
+#  post:
+#    IndiResultsVisual:
+#      output_format: video
+#
+#  static_shared_value:
+#    CamIntrinsicPara:
+#      data_type: SharedArray_Float
+#      data_shape: [ 3, 4 ]
+#      data_value: [ [ 11.11, 0., 128.0, 0 ],
+#                   [ 0, 11.11, 128.0, 0 ],
+#                   [ 0, 0, 1.0000, 0 ] ]
 
 #FuncTest_3:
 #  producer:
