@@ -1,11 +1,8 @@
 from .. import BaseModel_head
 
-import time
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
 
 import math
 from ...loss import BaseModel_loss
@@ -13,16 +10,13 @@ from src.model.networks.loss.losses import FocalLoss
 from src.model.networks.loss.losses import RegL1Loss, RegLoss, NormRegL1Loss, RegWeightedL1Loss
 from src.model.utils import _sigmoid, _tranpose_and_gather_feat
 
+
 def fill_fc_weights(layers):
     for m in layers.modules():
         if isinstance(m, nn.Conv2d):
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-# def test_weight(layers):
-#     for m in layers.modules():
-#         if isinstance(m, nn.Conv2d):
-#             m.weight.data.fill_(0.0)
 
 class FairMOT(BaseModel_head):
     def __init__(self,
@@ -170,7 +164,6 @@ class McMotLoss(BaseModel_loss):
                 for cls_id, id_num in self.nID_dict.items():
                     inds = torch.where(cls_id_map == cls_id)
                     if inds[0].shape[0] == 0:
-                        # print('skip class id', cls_id)
                         continue
 
                     # --- 取cls_id对应索引处的特征向量
@@ -193,7 +186,6 @@ class McMotLoss(BaseModel_loss):
 
                     # --- 累加每一个检测类别的ReID loss
                     # 选择一: 使用交叉熵优化ReID
-                    # print('\nNum objects:'); print(cls_id_target.nelement())
                     # reid_loss += self.ce_loss(cls_id_pred, cls_id_target) / float(cls_id_target.nelement())
                     reid_loss += self.ce_loss(cls_id_pred, cls_id_target) / len(self.nID_dict)
 
@@ -227,7 +219,6 @@ class McMotLoss(BaseModel_loss):
                    + self.s_det
 
         loss *= 0.5
-        # print(wh_loss)
         if cfg['id_weight'] > 0:
             loss_stats = {'loss': loss,
                           'hm_loss': hm_loss,
