@@ -105,13 +105,12 @@ class ShuffleV2Block(nn.Module):
 class ShuffleNetV2(BaseModel_backbone):
     def __init__(
         self,
-        model_size="1.5x",
+        model_size="1.0x",
         out_stages=(2, 3, 4),
-        with_first_conv=False,
         with_last_conv=False,
-        kernal_size=3,
+        kernel_size=3,
         activation="ReLU",
-        pretrain=False,
+        pretrain=True,
         **kwargs,
     ):
         super(ShuffleNetV2, self).__init__(**kwargs)
@@ -123,9 +122,8 @@ class ShuffleNetV2(BaseModel_backbone):
         self.stage_repeats = [4, 8, 4]
         self.model_size = model_size
         self.out_stages = out_stages
-        self.with_first_conv = with_first_conv
         self.with_last_conv = with_last_conv
-        self.kernal_size = kernal_size
+        self.kernel_size = kernel_size
         self.activation = activation
         if model_size == "0.5x":
             self._stage_out_channels = [24, 48, 96, 192, 1024]
@@ -178,12 +176,10 @@ class ShuffleNetV2(BaseModel_backbone):
         self._initialize_weights(pretrain)
 
     def forward(self, x):
+        output = []
         x = self.conv1(x)
         x = self.maxpool(x)
-        output = []
-
-        if self.with_first_conv:
-            output.append(x)
+        output.append(x)
 
         for i in range(2, 5):
             stage = getattr(self, "stage{}".format(i))

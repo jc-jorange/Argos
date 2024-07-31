@@ -3,5 +3,3 @@ model_size: 1.5x
 out_stages: [2,3,4]
 # default activation is ReLU
 activation: LeakyReLU
-pretrain: True
-with_first_conv: True
