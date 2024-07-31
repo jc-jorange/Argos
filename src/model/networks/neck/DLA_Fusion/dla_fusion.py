@@ -121,63 +121,22 @@ class DLAUp(nn.Module):
             out.insert(0, layers[-1])
 
         return out
-#
-# class SE_layers(nn.Module):
-#     def __init__(self, channels):
-#         super(SE_layers, self).__init__()
-#         self.channels = channels
-#         for i in range(len(channels)):
-#             setattr(self, 'se_{}'.format(i),
-#                     SELayer(channels[i]))
-#
-#     def forward(self, x, startp, endp):
-#         for i in range(startp, endp+1):
-#             se = getattr(self, 'se_' + str(i - startp))
-#             x[i] = se(x[i])
-#
-#         return x
-#
-#
-# class CBAM_layers(nn.Module):
-#     def __init__(self, channels):
-#         super(CBAM_layers, self).__init__()
-#         self.channels = channels
-#         for i in range(len(channels)):
-#             setattr(self, 'cbam_{}'.format(i),
-#                     CBAM(channels[i]))
-#
-#     def forward(self, x, startp, endp):
-#         for i in range(startp, endp+1):
-#             cbam = getattr(self, 'cbam_' + str(i - startp))
-#             x[i] = cbam(x[i])
-#
-#         return x
-
-
-# class Interpolate(nn.Module):
-#     def __init__(self, scale, mode):
-#         super(Interpolate, self).__init__()
-#         self.scale = scale
-#         self.mode = mode
-#
-#     def forward(self, x):
-#         x = F.interpolate(x, scale_factor=self.scale, mode=self.mode, align_corners=False)
-#         return x
 
 
 class DLA_Fusion(BaseModel_neck):
     def __init__(self,
-                 last_level,
+                 level_length=3,
                  use_ghost_module=False,
                  use_se=False,
                  use_cbam=False,
                  **kwargs):
         super().__init__(**kwargs)
-        self.first_level = 2
-        self.last_level = last_level
-        channels = [16, 32] + self.input_dim if len(self.input_dim) < last_level else self.input_dim
+        self.level_length = level_length if level_length >= len(self.input_dim) else len(self.input_dim)-1
+        self.last_level = len(self.input_dim) - 1
+        self.first_level = self.last_level - self.level_length
+        channels = self.input_dim
         self.channels = channels
-        scales = [2 ** i for i in range(len(channels[self.first_level:]))]
+        scales = [2 ** i for i in range(self.level_length + 1)]
         self.scales = scales
 
         self.dla_up = DLAUp(self.first_level, channels[self.first_level:], scales,
@@ -188,17 +147,7 @@ class DLA_Fusion(BaseModel_neck):
                             use_ghost_module=use_ghost_module, use_se=use_se, use_cbam=use_cbam)
 
     def forward(self, x):
-        t_s = time.perf_counter()
         x = list(x)
-        # if len(x) < self.last_level+1:
-        #     for i in range((self.last_level+1)-len(x)):
-        #         x.insert(0, None)
-        #
-        # if self.se_layer:
-        #     self.se_layer(x, self.first_level, self.last_level)
-        #
-        # if self.cbam:
-        #     self.cbam(x, self.first_level, self.last_level)
 
         x = self.dla_up(x)
 
@@ -207,7 +156,4 @@ class DLA_Fusion(BaseModel_neck):
             y.append(x[i].clone())
         self.ida_up(y, 0, len(y))
 
-        t_e = time.perf_counter()
-        t = t_e - t_s
-        print('DLA_fusion Neck Time: {}'.format(t))
         return [y[-1]]
