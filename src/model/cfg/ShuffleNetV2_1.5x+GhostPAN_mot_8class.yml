@@ -4,10 +4,11 @@ head:
   _description: ''
 backbone:
   _description: ''
-  cfg_name: 'default'
-  model_name: 'ParNet'
+  cfg_name: '1.5x'
+  model_name: 'ShuffleNetV2'
 neck:
   _description: ''
   cfg_name: 'default'
-  model_name: 'DLA_Fusion'
+  model_name: 'Ghost_PAN'
 _description: ''
+max_classes_num: 8

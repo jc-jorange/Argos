@@ -4,10 +4,10 @@ head:
   _description: ''
 backbone:
   _description: ''
-  cfg_name: 'WithFirst'
+  cfg_name: '1.0x'
   model_name: 'ShuffleNetV2'
 neck:
   _description: ''
   cfg_name: 'default'
-  model_name: 'Ghost_PAN'
+  model_name: 'DLA_Fusion'
 _description: ''
