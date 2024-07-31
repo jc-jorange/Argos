@@ -2,10 +2,10 @@
     "root":"/media/jc/Extend/Library/Dataset",
     "train":
     {
-        "mot17":"./lib/dataset/data_path/mot17_half.half"
+        "mot17":"./src/dataset/data_path/mot17_half.half"
     },
     "test":
     {
-        "mot17":"./lib/dataset/data_path/mot17_half.val"
+        "mot17":"./src/dataset/data_path/mot17_half.val"
     }
 }

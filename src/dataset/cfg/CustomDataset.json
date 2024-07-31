@@ -1,0 +1,11 @@
+{
+    "root":"/media/jc/Extend/Library/Dataset",
+    "train":
+    {
+        "mot17":"./src/dataset/data_path/CustomDataset.trainall"
+    },
+    "test":
+    {
+        "mot17":"./src/dataset/data_path/CustomDataset.trainall"
+    }
+}

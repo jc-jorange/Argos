@@ -2,14 +2,10 @@
     "root":"/media/jc/Extend/Library/Dataset",
     "train":
     {
-        "mot17":"./lib/dataset/data_path/mot17.train"
-    },
-    "test_emb":
-    {
-        "mot17":"./lib/dataset/data_path/mot17.train"
+        "mot17":"./src/dataset/data_path/mot17.trainall"
     },
     "test":
     {
-        "mot17":"./lib/dataset/data_path/mot17.train"
+        "mot17":"./src/dataset/data_path/mot17.trainall"
     }
 }
