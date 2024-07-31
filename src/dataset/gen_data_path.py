@@ -1,6 +1,7 @@
 import os
 import glob
 import math
+from tqdm import tqdm
 
 
 def gen_data_path(root_dir: str,
@@ -26,26 +27,29 @@ def gen_data_path(root_dir: str,
                 open(os.path.join(save_dir, half_file_name), 'w') as half, \
                 open(os.path.join(save_dir, val_file_name), 'w') as val:
             seq_name: str
-            for seq_name in seq_names:
+            for seq_name in tqdm(seq_names, desc='Total sequences'):
                 seq_path = os.path.join(real_path, seq_name, seq_folder_name)
                 images = sorted(glob.glob(seq_path + '/*.' + image_formate))
                 len_all = len(images)
-                for count, image in enumerate(images):
-                    print(image[len(root_dir) + 1:], file=train)
+                if len_all <= 0:
+                    raise ValueError(f'No images in dataset path {seq_path}')
+                for count, image_path in enumerate(images):
+                    path_from_root = os.path.abspath(image_path)[len(os.path.abspath(root_dir)) + 1:]
+                    print(path_from_root, file=train)
                     if count < math.floor(len_all * train_ratio):
-                        print(image[len(root_dir) + 1:], file=half)
+                        print(path_from_root, file=half)
                     else:
-                        print(image[len(root_dir) + 1:], file=val)
+                        print(path_from_root, file=val)
         train.close(), half.close(), val.close()
         print(f'generation over')
 
 
 if __name__ == '__main__':
-    gen_data_path(root_dir='D:/Library/Dataset',
-                  mot_path_in_root='AutoDataset/Experiment_02/Train/images',
-                  dataset_name='FuncTest',
-                  save_dir=r'/src/dataset/data_path',
+    gen_data_path(root_dir='/media/jc/Extend/Library/Dataset/',
+                  mot_path_in_root='AutoDataset/RealWorldExperiment/Train/images',
+                  dataset_name='CustomDataset',
+                  save_dir=r'/home/jc/PythonScripts/Argos/src/dataset/data_path',
                   seq_folder_name='',
-                  train_ratio=1.0,
+                  train_ratio=0.5,
                   seq_endswith='',
                   image_formate='png')
