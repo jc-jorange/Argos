@@ -21,7 +21,7 @@ from .utils import (
     MemoryEfficientSwish,
     calculate_output_image_size
 )
-
+from .._masterclass import BaseModel_backbone
 
 VALID_MODELS = (
     'efficientnet-b0', 'efficientnet-b1', 'efficientnet-b2', 'efficientnet-b3',
@@ -140,7 +140,7 @@ class MBConvBlock(nn.Module):
         self._swish = MemoryEfficientSwish() if memory_efficient else Swish()
 
 
-class EfficientNet(nn.Module):
+class EfficientNet(BaseModel_backbone):
     """EfficientNet model.
        Most easily loaded with the .from_name or .from_pretrained methods.
 
