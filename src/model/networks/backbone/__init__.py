@@ -3,7 +3,6 @@ from enum import Enum, unique
 from ._masterclass import BaseModel_backbone
 
 from .CSP_Custom import custom_csp
-from .EfficientNet_Lite import efficientnet_lite
 from .GhostNet import ghostnet
 from .MobileNet_V2 import mobilenetv2
 from .RepVGG import repvgg
@@ -32,7 +31,6 @@ class E_BackboneName(Enum):
 
 backbone_factory_ = {
     E_BackboneName.CSP_Custom.name: custom_csp.CustomCspNet,
-    E_BackboneName.EfficientNet_Lite.name: efficientnet_lite.EfficientNetLite,
     E_BackboneName.GhostNet.name: ghostnet.GhostNet,
     E_BackboneName.MobileNet_V2.name: mobilenetv2.MobileNetV2,
     E_BackboneName.RepVGG.name: repvgg.RepVGG,
