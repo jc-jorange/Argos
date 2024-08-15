@@ -66,7 +66,7 @@ class AddressTransLoader(BaseCameraTransLoader):
         trans = []
         timestamp = time.time()
 
-        if self.connect_type == 'UDP':
+        if self.connect_type == ESupportConnectionType.UDP.name:
             self.ConnectionSocket.setblocking(False)
             self.ConnectionSocket.settimeout(1)
             try:
@@ -100,7 +100,8 @@ class AddressTransLoader(BaseCameraTransLoader):
                             pass
             except timeout or OSError:
                 self.b_socket_alive = False
-        elif self.connect_type == 'TCP':
+
+        elif self.connect_type == ESupportConnectionType.TCP.name:
             try:
                 data = self.ConnectionSocket.recv(_bytes_num_flag)
                 if b'\x00\x00' in data:

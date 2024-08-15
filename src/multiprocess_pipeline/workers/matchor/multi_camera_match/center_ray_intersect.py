@@ -22,7 +22,10 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
     def get_ray_position(p: np.ndarray, d: np.ndarray, t: float) -> np.ndarray:
         return p + (t * d)
 
-    def match_content(self, name, predict_result: S_Match_point) -> S_Match_point:
+    def match_content(self, name, predict_result: S_Match_point) -> (S_Match_point, S_Match_point):
+        global_position = np.asarray(predict_result)
+        global_position.fill(0)
+
         predict_result_in_camera_coord = self.convert_predict_to_camera_coord(name, predict_result)
         class_id_predict_result = np.nonzero(predict_result)
         class_id_baseline = np.nonzero(self.baseline_result)
@@ -39,7 +42,10 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
             id_predict = class_id_predict_result[1][i_predict * 4]
             coord_predict = predict_result_in_camera_coord[class_predict, id_predict][0:3]
 
-            min_distance_tuple = (-1, -1, 1000000)
+            class_base = -1
+            id_base = -1
+
+            min_distance_tuple = (-1, -1, 1000000, np.array([0., 0., 0., 0.]))
             for i_base in range(len(class_id_baseline[0]) // 4):
                 class_base = class_id_baseline[0][i_base * 4]
                 id_base = class_id_baseline[1][i_base * 4]
@@ -62,12 +68,14 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
                 #       f'p1: {p1}', f'p2: {p2}', f't1: {t1}', f't2: {t2}')
                 if distance < self.threshold and 0 < t1 < self.max_range and 0 < t2 < self.max_range:
                     if distance < min_distance_tuple[2]:
-                        min_distance_tuple = (class_base, id_base, distance)
+                        min_distance_tuple = (class_base, id_base, distance, np.append(p1, 1))
 
             if min_distance_tuple[0] > -1:
                 if class_predict != min_distance_tuple[0] or id_predict != min_distance_tuple[1]:
-                    predict_result[min_distance_tuple[0], min_distance_tuple[1]] = predict_result[class_predict, id_predict]
+                    predict_result[min_distance_tuple[0], min_distance_tuple[1]] = predict_result[class_predict,
+                                                                                                  id_predict]
                     predict_result[class_predict, id_predict, :] = 0
+                    global_position[min_distance_tuple[0], min_distance_tuple[1]] = min_distance_tuple[3]
 
                 matched_baseline_classandid.update({min_distance_tuple[0]: min_distance_tuple[1]})
             else:
@@ -99,4 +107,4 @@ class CenterRayIntersectMatchor(BaseMultiCameraMatchor):
                     self.baseline_result_in_camera[class_predict, id_predict] = \
                         predict_result_in_camera_coord[class_predict, id_predict]
 
-        return predict_result
+        return predict_result, global_position

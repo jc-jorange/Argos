@@ -1,19 +1,23 @@
 FuncTest_1:
   producer:
     ImageLoader:
-      image_path: "/media/jc/Extend/Output/OpenShot/Old/Test_04.mp4"
+      image_path: "D:\\Library\\Experiment\\HandArm\\WithoutMoving\\Recent\\movies\\short\\Test_04.mp4"
       loader: Video
       normalized_image_shape: [ 3, 608, 1088 ]
 
   consumer:
     Track:
       arch: DLA34_mot_8class
-      load_model: /home/jc/PythonScripts/Argos/results/train_result/RealWorldExperiment/2024-07-22-16-16-02/DLA34_mot_8class.pth
+      load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-16-16-02\DLA34_mot_8class.pth
       conf_thres: 0.4
       track_buffer: 30
 
     PathPredict:
       predictor_name: HermiteSpline
+
+    DataSend:
+      sender_name: Address
+      target: "UDP:127.0.0.1:8000"
 
   post:
     IndiResultsVisual:

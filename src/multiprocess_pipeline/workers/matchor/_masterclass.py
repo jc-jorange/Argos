@@ -28,10 +28,10 @@ class BaseMatchor:
     def get_baseline_result(self) -> S_Match_point:
         ...
 
-    def match_content(self, name, predict_result: S_Match_point) -> S_Match_point:
+    def match_content(self, name, predict_result: S_Match_point) -> (S_Match_point, S_Match_point):
         ...
 
-    def get_match_result(self, camera_name, predict_result) -> S_Match_point:
+    def get_match_result(self, camera_name, predict_result) -> (S_Match_point, S_Match_point):
         if not isinstance(self.baseline_result_in_camera, S_Match_point):
             self.baseline_result_in_camera = self.get_baseline_result()
 

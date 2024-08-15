@@ -54,8 +54,9 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         self.match_times = 0
 
         self_shared_data = self.data_hub.dict_shared_data[self.pipeline_name]
-        self.b_read_together = E_PipelineSharedDataName.CameraTransform.name in self_shared_data.keys() \
-                               and E_PipelineSharedDataName.TransformTimestamp.name in self_shared_data.keys()
+        self.b_read_together = \
+            E_PipelineSharedDataName.CameraTransform.name in self_shared_data.keys() \
+            and E_PipelineSharedDataName.TransformTimestamp.name in self_shared_data.keys()
 
     def run_begin(self) -> None:
         super(MultiCameraIdMatchProcess, self).run_begin()
@@ -172,6 +173,9 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
             if self.all_camera_transform and self.all_camera_timestamp:
                 self.logger.debug('Get camera transform data')
 
+                frame = 0
+                subframe = 0
+                global_position_last = numpy.empty((1,))
                 for pipeline_name, each_pass in self.port_dict.items():
                     t_match_each_start = time.perf_counter()
                     if pipeline_name == self.pipeline_name:
@@ -186,8 +190,6 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                     pipeline_shared_data = self.data_hub.dict_shared_data[pipeline_name]
 
                     timestamp_image = 0
-                    frame = 0
-                    subframe = 0
                     objects_result_content = None
                     objects_result = None
                     b_read_result = True
@@ -224,10 +226,19 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                             self.matchor.baseline_camera_transform = camera_transform
                             self.matchor.baseline_result = objects_result_content
                             match_result = objects_result_content
+                            global_position_last = numpy.asarray(objects_result_content)
+                            global_position_last.fill(0)
                             self.logger.debug(f'Set matchor baseline object result')
 
                         else:
-                            match_result = self.matchor.get_match_result(pipeline_name, objects_result_content)
+                            global_position_last: numpy.ndarray
+                            match_result, global_position_current = \
+                                self.matchor.get_match_result(pipeline_name, objects_result_content)
+                            mask_c = numpy.where(global_position_current[:, :, 3] == 1, 1, 0)
+                            mask_l = numpy.where(global_position_last[:, :, 3] == 1, 1, 0)
+                            new = mask_c - (mask_c * mask_l)
+                            n_new = numpy.nonzero(new)
+                            global_position_last[n_new] = mask_c[n_new]
 
                     else:
                         self.logger.debug(f'No camera {pipeline_name} data')
@@ -240,14 +251,14 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                     fps = 1 / (t_match_each_end - t_match_each_start)
                     result_frame = convert_numpy_to_dict(match_result, frame, subframe, fps)
 
-                    if self.output_port.size() < self.output_buffer:
-                        self.logger.debug(f'Send data to next')
-                        self.output_port.send(result_frame)
-
                     save_dir = self.results_save_dir[pipeline_name]
                     self.save_result_to_file(save_dir, result_frame)
 
                 self.match_times += 1
+
+                if self.output_port.size() < self.output_buffer:
+                    self.logger.debug(f'Send data to next')
+                    self.output_port.send((frame, subframe, global_position_last))
 
             else:
                 self.logger.debug(f'No camera transform data')
