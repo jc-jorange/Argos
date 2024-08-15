@@ -116,6 +116,7 @@ class TrackerProcess(ConsumerProcess):
 
             result_per_subframe = {}
             total_track_count = 0
+            self.current_track_result.fill(0)
             for cls_id in range(self.info_data.classes_max_num):  # process each class id
                 online_targets = online_targets_dict[cls_id]
                 result_per_subframe[cls_id] = {}
