@@ -8,102 +8,58 @@ S_point = np.ndarray  # shape:[class, id, (xy)]
 class BasePredictor:
 
     def __init__(self,
-                 max_step=300,
+                 max_step=30,
                  max_distance=50) -> None:
         self.time_0 = 0.0
         self.dt_base = 1.0
         self.p0_list = []
         self.time_list = []
-        self.track_counter = None
+        self.predict_counter = None
+        self.predict_keeper = None
+        self.last_predict = None
 
-        self.max_step = max_step
-        self.max_distance = max_distance
+        self.max_step = max(0, max_step)
+        self.max_distance = max(1, max_distance)
 
-    def filter_close_track(self, point: S_point, t: float) -> {S_point}:
-        predict_result = self.get_predicted_position(t)
-        if isinstance(predict_result, np.ndarray):
-            predict_result = predict_result
-        else:
-            predict_result = np.zeros(point.shape)
-
-        both = point * predict_result
-        both = np.where(both > 0, 1, 0)
-        m_track = np.where(both, 0, point)
-        m_predict = np.where(both, 0, predict_result)
-
-        checked_predict = []
-        dict_reid = {}  # {(origin_track_class&id) : (predict_class&id)}
-
-        classandid_track = np.nonzero(m_track)
-        classandid_predict = np.nonzero(m_predict)
-
-        for i_t in range(len(classandid_track[0])):
-            class_t = classandid_track[0][i_t]
-            id_t = classandid_track[1][i_t]
-            coord_t = m_track[class_t, id_t]
-            mm = 2 ** 16
-            i_checked = -1
-            for i_p in range(len(classandid_predict[0])):
-                class_p = classandid_predict[0][i_p]
-                id_p = classandid_predict[1][i_p]
-
-                try:
-                    if (class_p, id_p) in checked_predict:
-                        continue
-                except KeyError:
-                    pass
-
-                coord_p = m_predict[class_p, id_p]
-
-                dist = np.linalg.norm(coord_p - coord_t)
-
-                if dist <= self.max_distance and dist < mm:
-                    dict_reid[(class_t, id_t)] = (class_p, id_p)
-                    i_checked = i_p
-                    mm = dist
-            if i_checked >= 0:
-                class_checked = classandid_predict[0][i_checked]
-                id_checked = classandid_predict[1][i_checked]
-                checked_predict.append((class_checked, id_checked))
-
-        return dict_reid
-
-    def set_new_base(self, point: S_point) -> S_point:
+    def set_new_base(self, track_points: S_point) -> S_point:
         t_current = time.perf_counter()
 
-        predict_result = self.get_predicted_position(t_current)
+        # initial counter
+        if not isinstance(self.predict_counter, np.ndarray):
+            # self.p0_list[-1] += self.p0_list[-2] * self.predict_keeper
+            self.predict_counter = np.where(track_points > 0, self.max_step, 0)
+            self.predict_keeper = np.zeros(track_points.shape)
+            self.last_predict = np.zeros(track_points.shape)
 
-        if isinstance(predict_result, np.ndarray):
-            reid_track_dict = self.filter_close_track(point, t_current)
+        self.time_0 = t_current
+        self.p0_list.append(track_points)
+        self.time_list.append(t_current)
 
-            for origin_track_id, new_track_id in reid_track_dict.items():
-                point[new_track_id] = point[origin_track_id]
-                point[origin_track_id] = 0
-            # self.track_counter[np.nonzero(point)] = self.max_step
+        # Get normalized tracked and retracked, and non retracked but in keeper
+        track_normalized = np.where(track_points > 0, 1, 0)
+        retracked_predict = (track_normalized * self.predict_keeper).astype(np.int32)
+        new_tracked = track_normalized - retracked_predict
+        none_retracked_predict = (self.predict_keeper - retracked_predict).astype(np.int32)
+        self.predict_keeper = track_normalized + none_retracked_predict
+        self.p0_list[-1] += self.last_predict * none_retracked_predict  # copy keep predict
 
-            # print(numpy.nonzero(predict_result))
-            both = point * predict_result
-            both = np.where(both > 0, 1, 0)
-            # m_track = np.where(both, 0, point)
-            m_predict = np.where(both, 0, predict_result)
-            point = point + m_predict
+        # Tracked results reset to max step counter
+        self.predict_counter[np.nonzero(track_normalized)] = self.max_step
+        # None retrack counter minus 1
+        self.predict_counter -= none_retracked_predict
+        # Clamp to 0
+        self.predict_counter = np.where(self.predict_counter >= 0, self.predict_counter, 0)
+        mask = np.where(self.predict_counter > 0, 1, 0)
+        self.predict_keeper = self.predict_keeper * mask
 
-            self.time_0 = t_current
-            self.p0_list.pop(0)
-            self.time_list.pop(0)
-            self.p0_list.append(point)
-            self.time_list.append(t_current)
-
-            return predict_result
-        else:
-            self.p0_list.append(point)
-            self.time_list.append(t_current)
+        return track_points
 
     def clear(self) -> None:
         self.time_0 = 0.0
         self.dt_base = 1.0
         self.p0_list.clear()
         self.time_list.clear()
+        self.predict_counter = None
 
     def can_process_predict(self) -> bool:
         return True
@@ -113,6 +69,7 @@ class BasePredictor:
 
     def get_predicted_position(self, t: float) -> S_point or None:
         if self.can_process_predict():
-            return self.predict_content(t=t)
+            self.last_predict = self.predict_content(t=t)
+            return self.last_predict
         else:
             return None

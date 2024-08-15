@@ -13,16 +13,10 @@ class LinearSpline(BaseSpline):
         ]
 
     def can_process_predict(self) -> bool:
-        return len(self.p0_list) == 2
-
-    def spline_set_new_base(self) -> None:
-        while len(self.p0_list) >= 3:
-            self.p0_list.pop(0)
-            self.time_list.pop(0)
-        if self.can_process_predict():
-            self.process_geometrical_constraint_matrix()
+        return len(self.p0_list) >= 3
 
     def process_geometrical_constraint_matrix(self) -> None:
+        super(LinearSpline, self).process_geometrical_constraint_matrix()
         raw_1 = torch.tensor(self.p0_list[-2])
         raw_2 = torch.tensor(self.p0_list[-1])
 

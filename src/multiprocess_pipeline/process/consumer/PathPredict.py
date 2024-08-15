@@ -22,8 +22,8 @@ class PathPredictProcess(ConsumerProcess):
     def __init__(self,
                  predictor_name: str,
                  *args,
-                 max_step=300,
-                 max_distance=50,
+                 max_step=30,
+                 max_distance=5,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.predictor_name = predictor_name
@@ -59,16 +59,19 @@ class PathPredictProcess(ConsumerProcess):
 
         t_frame_start = time.perf_counter()
 
+        # Get this pipeline producer is alive
         hub_b_loading = self.data_hub.dict_bLoadingFlag[self.pipeline_name]
 
         while hub_b_loading.value:
             b_get_new_data = True
             t_subframe_start = time.perf_counter()
             try:
+                # Get track result from last consumer
                 track_result = self.last_process_port.read()
                 frame_get = track_result[0]
                 self.current_track_result = track_result[-1]
                 self.logger.debug(f'Get track result @ frame {frame}')
+                # Confirm if we get a new frame result
                 b_get_new_data = frame != frame_get
             except queues.Empty:
                 b_get_new_data = False
@@ -85,12 +88,14 @@ class PathPredictProcess(ConsumerProcess):
                 self.save_result_to_file(self.results_save_dir, self.all_predict_result)
                 self.logger.debug(f'Save last frame results to file')
 
+                # initial new frame predict result
                 self.all_predict_result = {frame: {}}
                 subframe = 0
                 frame_time = 0
 
                 t_frame_start = time.perf_counter()
 
+                # set new frame track result as new base to predictor
                 self.current_predict_result = self.predictor.set_new_base(self.current_track_result)
                 self.logger.debug(f'Set Predict base and set base as predict result')
 
@@ -98,6 +103,7 @@ class PathPredictProcess(ConsumerProcess):
                 self.logger.debug(f'Start subframe predict @ frame {frame}')
                 subframe_start_time = time.perf_counter()
 
+                # get current time predict result
                 self.current_predict_result = self.predictor.get_predicted_position(subframe_start_time)
                 if isinstance(self.current_predict_result, torch.Tensor):
                     self.current_predict_result = self.current_predict_result.numpy()
@@ -107,7 +113,6 @@ class PathPredictProcess(ConsumerProcess):
                 delta_t_predict = subframe_time_end - subframe_start_time
                 self.logger.debug(f'Predicted @ frame {frame} - subframe {subframe} by {delta_t_predict} s')
 
-            if frame:
                 if self.output_port.size() < self.output_buffer:
                     self.output_port.send((frame, subframe, self.current_predict_result))
                     self.logger.debug(f'Send predict results to next')
@@ -120,7 +125,7 @@ class PathPredictProcess(ConsumerProcess):
                     result_id = {}
                     valid_position = np.nonzero(self.current_predict_result)
                     target_num = len(valid_position[0]) // 4
-                    # print(target_num)
+
                     for i in range(target_num):
                         cls = valid_position[0][i * 4]
                         target_id = valid_position[1][i * 4]

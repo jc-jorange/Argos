@@ -15,6 +15,7 @@ class HermiteSpline(BaseSpline):
         return len(self.p0_list) >= 3
 
     def process_geometrical_constraint_matrix(self) -> None:
+        super(HermiteSpline, self).process_geometrical_constraint_matrix()
         raw_0 = torch.tensor(self.p0_list[-3])
         raw_1 = torch.tensor(self.p0_list[-2])
         raw_2 = torch.tensor(self.p0_list[-1])

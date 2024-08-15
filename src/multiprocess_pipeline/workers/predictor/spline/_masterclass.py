@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from .._masterclass import BasePredictor, S_point
 
@@ -24,7 +25,7 @@ class BaseSpline(BasePredictor):
     def set_new_base(self, point) -> S_point:
         if self.can_process_predict():
             self.process_geometrical_constraint_matrix()
-        return super(BaseSpline, self).set_new_base(point=point)
+        return super(BaseSpline, self).set_new_base(track_points=point)
 
     def clear(self) -> None:
         super(BaseSpline, self).clear()
@@ -36,7 +37,13 @@ class BaseSpline(BasePredictor):
         ]
 
     def process_geometrical_constraint_matrix(self) -> None:
-        self.m_geometrical_constraint = torch.tensor(self.m_geometrical_constraint)
+        p_current = self.p0_list[-1]
+        p_previous = self.p0_list[-2]
+        d_p = p_current - p_previous
+        # d_p = d_p[:, :, 1:2]
+        d_p = np.abs(d_p)
+        p_current = np.where(d_p < self.max_distance, p_previous, p_current)
+        self.p0_list[-1] = p_current
 
     def predict_content(self, t: float) -> S_point:
         super().predict_content(t)
