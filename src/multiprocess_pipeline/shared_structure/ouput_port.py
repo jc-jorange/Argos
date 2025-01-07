@@ -21,12 +21,14 @@ dict_OutputPortDataType = {
 class Struc_ConsumerOutputPort:
     def __init__(self,
                  opt,
+                 consumer_name: str,
                  output_type: E_SharedSaveType,
                  data_type: E_OutputPortDataType,
                  data_shape: tuple
                  ):
         self.opt = opt
 
+        self.consumer_name = consumer_name
         self.output_type = output_type
         self.data_type = data_type
         self.data_shape = None
@@ -52,7 +54,13 @@ class Struc_ConsumerOutputPort:
 
         if self.output_type == E_SharedSaveType.Queue:
             self.output: mp.Queue
-            result = self.output.get(block=False)
+            if self.output.empty():
+                result = None
+            else:
+                try:
+                    result = self.output.get(block=False)
+                except mp.queues.Empty:
+                    result = None
 
         elif self.output_type == E_SharedSaveType.SharedArray_Float:
             self.output: mp.Array
@@ -67,6 +75,9 @@ class Struc_ConsumerOutputPort:
 
     def send(self, data) -> bool:
         b_result = False
+
+        if self.size() > 0:
+            self.read()
 
         if self.output_type == E_SharedSaveType.Queue:
             self.output: mp.Queue
@@ -105,7 +116,7 @@ class Struc_ConsumerOutputPort:
             self.output: mp.Queue
             while self.output.qsize() > 0:
                 try:
-                    self.output.get()
+                    self.output.get(block=False)
                 except RuntimeError:  # CUDA error: invalid device context
                     pass
             self.output.close()

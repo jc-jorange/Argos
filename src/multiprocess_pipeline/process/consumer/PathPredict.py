@@ -1,5 +1,4 @@
 import time
-from multiprocessing import queues
 from collections import defaultdict
 
 from . import ConsumerProcess
@@ -22,7 +21,7 @@ class PathPredictProcess(ConsumerProcess):
     def __init__(self,
                  predictor_name: str,
                  *args,
-                 max_step=30,
+                 max_step=2,
                  max_distance=5,
                  **kwargs):
         super().__init__(*args, **kwargs)
@@ -53,28 +52,32 @@ class PathPredictProcess(ConsumerProcess):
         self.logger.info('Start predicting')
 
         self.predictor.time_0 = time.perf_counter()
+        timestamp = 0
         frame_get = 0
-        frame = 0
+        frame = -1
         subframe = 0
 
         t_frame_start = time.perf_counter()
 
         # Get this pipeline producer is alive
         hub_b_loading = self.data_hub.dict_bLoadingFlag[self.pipeline_name]
+        self.send_time = time.perf_counter()
 
         while hub_b_loading.value:
             b_get_new_data = True
             t_subframe_start = time.perf_counter()
-            try:
-                # Get track result from last consumer
-                track_result = self.last_process_port.read()
-                frame_get = track_result[0]
-                self.current_track_result = track_result[-1]
-                self.logger.debug(f'Get track result @ frame {frame}')
-                # Confirm if we get a new frame result
-                b_get_new_data = frame != frame_get
-            except queues.Empty:
+
+            # Get track result from last consumer
+            track_result = self.last_process_port.read()
+            if track_result is None:
                 b_get_new_data = False
+            else:
+                timestamp = track_result[0]
+                frame_get = track_result[1]
+                self.current_track_result = track_result[-1]
+                self.logger.debug(f'Get track result @ frame {frame_get}')
+                # Confirm if we get a new frame result
+                b_get_new_data = (frame != frame_get)
 
             if b_get_new_data:
                 t_frame_end = time.perf_counter()
@@ -96,7 +99,7 @@ class PathPredictProcess(ConsumerProcess):
                 t_frame_start = time.perf_counter()
 
                 # set new frame track result as new base to predictor
-                self.current_predict_result = self.predictor.set_new_base(self.current_track_result)
+                self.current_predict_result = self.predictor.set_new_base(self.current_track_result, t_frame_start)
                 self.logger.debug(f'Set Predict base and set base as predict result')
 
             elif frame:
@@ -113,11 +116,13 @@ class PathPredictProcess(ConsumerProcess):
                 delta_t_predict = subframe_time_end - subframe_start_time
                 self.logger.debug(f'Predicted @ frame {frame} - subframe {subframe} by {delta_t_predict} s')
 
-                if self.output_port.size() < self.output_buffer:
-                    self.output_port.send((frame, subframe, self.current_predict_result))
-                    self.logger.debug(f'Send predict results to next')
-                else:
+                if self.output_port.size() >= self.output_buffer:
                     self.logger.debug(f'Output port over {self.output_buffer} buffer size')
+                    self.output_port.read()
+                self.output_port.send((timestamp, frame, subframe, self.current_predict_result))
+                # print(f'Predict send timespace: {time.perf_counter() - self.send_time}')
+                self.send_time = time.perf_counter()
+                self.logger.debug(f'Send predict results to next')
 
                 if isinstance(self.current_predict_result, np.ndarray):
                     result_each_subframe = {}

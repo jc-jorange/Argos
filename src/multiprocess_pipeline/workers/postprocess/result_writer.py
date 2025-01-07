@@ -52,38 +52,39 @@ class ImageResultWriter(BasePost):
         last_subframe = -1
         last_frame = -1
 
-        with open(self.results_dir, 'r') as f:
-            lines = f.readlines()
-            for each_line in lines:
-                results_raw = each_line.split(',')
-                frame = int(results_raw[0])
-                subframe = int(results_raw[1])
-                cls = int(results_raw[2])
-                track_id = int(results_raw[3])
-                x1 = float(results_raw[4])
-                y1 = float(results_raw[5])
-                x2 = float(results_raw[6])
-                y2 = float(results_raw[7])
-                score = float(results_raw[8])
-                fps = float(results_raw[9])
+        if os.path.exists(self.results_dir):
+            with open(self.results_dir, 'r') as f:
+                lines = f.readlines()
+                for each_line in lines:
+                    results_raw = each_line.split(',')
+                    frame = int(results_raw[0])
+                    subframe = int(results_raw[1])
+                    cls = int(results_raw[2])
+                    track_id = int(results_raw[3])
+                    x1 = float(results_raw[4])
+                    y1 = float(results_raw[5])
+                    x2 = float(results_raw[6])
+                    y2 = float(results_raw[7])
+                    score = float(results_raw[8])
+                    fps = float(results_raw[9])
 
-                if frame != last_frame:
-                    result_subframe = defaultdict(tuple)
-                    last_frame = frame
-                    last_subframe = -1
-                    last_clas = -1
-                if subframe != last_subframe:
-                    result_cls = defaultdict(dict)
-                    last_subframe = subframe
-                    last_clas = -1
-                if cls != last_clas:
-                    result_id = defaultdict(tuple)
-                    last_clas = cls
+                    if frame != last_frame:
+                        result_subframe = defaultdict(tuple)
+                        last_frame = frame
+                        last_subframe = -1
+                        last_clas = -1
+                    if subframe != last_subframe:
+                        result_cls = defaultdict(dict)
+                        last_subframe = subframe
+                        last_clas = -1
+                    if cls != last_clas:
+                        result_id = defaultdict(tuple)
+                        last_clas = cls
 
-                result_id[track_id] = ((x1, y1, x2, y2), score)
-                result_cls[cls] = result_id
-                result_subframe[subframe] = (result_cls, fps)
-                result_frame[frame] = result_subframe
+                    result_id[track_id] = ((x1, y1, x2, y2), score)
+                    result_cls[cls] = result_id
+                    result_subframe[subframe] = (result_cls, fps)
+                    result_frame[frame] = result_subframe
 
         self.results: {} = result_frame
 

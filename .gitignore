@@ -2,10 +2,9 @@
 
 /pretrained
 /results
+/test
 
 /train.sh
 /eval.sh
 /test.sh
 /val.sh
-/UdpTest.py
-/src/model/networks/nanodet/

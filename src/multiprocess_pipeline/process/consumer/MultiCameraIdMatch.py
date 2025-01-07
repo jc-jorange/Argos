@@ -1,4 +1,3 @@
-import multiprocessing
 import shutil
 import os
 import time
@@ -29,7 +28,7 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                  matchor_name: str,
                  *args,
                  max_range=10000000,
-                 threshold=1,
+                 threshold=5,
                  **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -38,6 +37,14 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         self.max_range = max_range
         self.threshold = threshold
 
+        self.matchor = None
+
+        self.all_camera_transform = []
+        self.all_camera_timestamp = []
+
+        self.cur_image_info = (0,0,0)
+        self.match_times = 0
+
         save_dir = self.results_save_dir[self.pipeline_name]
         shutil.rmtree(save_dir)
         os.mkdir(save_dir)
@@ -45,13 +52,8 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         for i, l in self.port_dict.items():
             if i != self.pipeline_name:
                 match_result_dir_dict[i] = self.making_dir(save_dir, str(i))
+
         self.results_save_dir = match_result_dir_dict
-
-        self.matchor = None
-
-        self.all_camera_transform = []
-        self.all_camera_timestamp = []
-        self.match_times = 0
 
         self_shared_data = self.data_hub.dict_shared_data[self.pipeline_name]
         self.b_read_together = \
@@ -95,8 +97,8 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                 if dict_timestamp and dict_transform_data:
                     all_transform.append(dict_transform_data)
                     all_timestamp.append(dict_timestamp)
-            all_transform.reverse()
-            all_timestamp.reverse()
+            # all_transform.reverse()
+            # all_timestamp.reverse()
 
         else:
             dict_transform_data = {}
@@ -138,7 +140,8 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
 
     def compare_timestamp_get_transform(self, pipeline: str, timestamp_image: int) -> numpy.ndarray:
         last_trans = None
-        last_d_timestamp = 999999999999
+        last_timestamp = None
+        last_d_timestamp = 1
         loop_length: int
 
         if self.all_camera_transform and self.all_camera_timestamp:
@@ -152,13 +155,31 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
                 d_timestamp = cur_timestamp - timestamp_image
                 if d_timestamp * last_d_timestamp <= 0:
                     if not isinstance(last_trans, numpy.ndarray):
-                        last_trans = cur_trans
-                        return cur_trans if abs(d_timestamp) > abs(last_d_timestamp) else last_trans
+                        return cur_trans
                 else:
-                    last_trans = cur_trans
                     last_d_timestamp = d_timestamp
 
+                last_trans, last_timestamp = self.read_camera_transform_and_timestamp(pipeline, 0)
+
         return last_trans
+
+    @staticmethod
+    def calculate_d_transform(t1: numpy.ndarray, t2: numpy.ndarray) -> numpy.ndarray:
+        result = numpy.zeros((4, 4))
+
+        r_t1 = t1[:3, :3]
+        r_t2 = t2[:3, :3]
+        d_r = r_t2.T @ r_t1
+
+        t_t1 = t1[:4, 3]
+        t_t2 = t2[:4, 3]
+        d_t = t_t2 - t_t1
+
+        result[:3, :3] = d_r
+        result[:4, 3] = d_t
+        result[3, 3] = 1
+
+        return result
 
     def run_action(self) -> None:
         super().run_action()
@@ -166,102 +187,117 @@ class MultiCameraIdMatchProcess(ConsumerProcess):
         match_result = numpy.empty((2, 2, 2))
 
         hub_b_loading = self.data_hub.dict_bLoadingFlag[self.pipeline_name]
+        self.send_time = time.perf_counter()
 
         while hub_b_loading.value:
-            self.all_camera_transform, self.all_camera_timestamp = self._get_all_camera_transform()
-
-            if self.all_camera_transform and self.all_camera_timestamp:
-                self.logger.debug('Get camera transform data')
-
-                frame = 0
-                subframe = 0
-                global_position_last = numpy.empty((1,))
-                for pipeline_name, each_pass in self.port_dict.items():
-                    t_match_each_start = time.perf_counter()
-                    if pipeline_name == self.pipeline_name:
-                        continue
-
-                    final_result_port: Struc_ConsumerOutputPort
-                    final_result_port = each_pass[-1]
-
-                    if final_result_port.data_type != E_OutputPortDataType.CameraTrack:
-                        raise TypeError(f'Pipeline {pipeline_name} last output data type not fit')
-
-                    pipeline_shared_data = self.data_hub.dict_shared_data[pipeline_name]
-
-                    timestamp_image = 0
-                    objects_result_content = None
-                    objects_result = None
-                    b_read_result = True
-
-                    try:
-                        timestamp_image = pipeline_shared_data[E_PipelineSharedDataName.ImageTimestamp.name].get()
-                        objects_result = final_result_port.read()
-                    except multiprocessing.queues.Empty:
-                        b_read_result = False
-                    if not (timestamp_image and objects_result):
-                        b_read_result = False
-
-                    if b_read_result:
-                        self.logger.debug(f'Read objects result form camera {pipeline_name} '
-                                          f'@ image timestamp {timestamp_image}')
-                        frame = objects_result[0]
-                        subframe = objects_result[1]
-                        objects_result_content = objects_result[2]
-
-                        if not isinstance(objects_result_content,
-                                          dict_OutputPortDataType[E_OutputPortDataType.CameraTrack.name][2]):
-                            self.logger.debug(f'Read none data from camera {pipeline_name}')
-                            break
-
-                        camera_transform = self.compare_timestamp_get_transform(pipeline_name, timestamp_image)
-                        if isinstance(camera_transform, numpy.ndarray):
-                            self.matchor.camera_transform_dict[pipeline_name] = camera_transform
-                            self.logger.debug(f'Set matchor camera transform from camera {pipeline_name}')
-                        else:
-                            self.logger.debug(f'Get transform from camera {pipeline_name} fail')
-                            break
-
-                        if pipeline_name == list(self.port_dict.keys())[0]:
-                            self.matchor.baseline_camera_transform = camera_transform
-                            self.matchor.baseline_result = objects_result_content
-                            match_result = objects_result_content
-                            global_position_last = numpy.asarray(objects_result_content)
-                            global_position_last.fill(0)
-                            self.logger.debug(f'Set matchor baseline object result')
-
-                        else:
-                            global_position_last: numpy.ndarray
-                            match_result, global_position_current = \
-                                self.matchor.get_match_result(pipeline_name, objects_result_content)
-                            mask_c = numpy.where(global_position_current[:, :, 3] == 1, 1, 0)
-                            mask_l = numpy.where(global_position_last[:, :, 3] == 1, 1, 0)
-                            new = mask_c - (mask_c * mask_l)
-                            n_new = numpy.nonzero(new)
-                            global_position_last[n_new] = mask_c[n_new]
-
-                    else:
-                        self.logger.debug(f'No camera {pipeline_name} data')
-                        if pipeline_name == list(self.port_dict.keys())[0]:
-                            break
-                        else:
-                            continue
-
-                    t_match_each_end = time.perf_counter()
-                    fps = 1 / (t_match_each_end - t_match_each_start)
-                    result_frame = convert_numpy_to_dict(match_result, frame, subframe, fps)
-
-                    save_dir = self.results_save_dir[pipeline_name]
-                    self.save_result_to_file(save_dir, result_frame)
-
-                self.match_times += 1
-
-                if self.output_port.size() < self.output_buffer:
-                    self.logger.debug(f'Send data to next')
-                    self.output_port.send((frame, subframe, global_position_last))
-
+            all_camera_transform_read, all_camera_timestamp_read = self._get_all_camera_transform()
+            if all_camera_transform_read and all_camera_timestamp_read:
+                self.all_camera_transform = all_camera_transform_read
+                self.all_camera_timestamp = all_camera_timestamp_read
+                self.logger.debug('Get new camera transform data')
             else:
                 self.logger.debug(f'No camera transform data')
+                # continue
+
+            timestamp_image = 0
+            frame = 0
+            subframe = 0
+            global_position = None
+
+            for pipeline_name, each_pass in self.port_dict.items():
+                t_match_each_start = time.perf_counter()
+                if pipeline_name == self.pipeline_name:
+                    continue
+
+                final_result_port: Struc_ConsumerOutputPort
+                final_result_port = each_pass[-1]
+
+                if final_result_port.data_type != E_OutputPortDataType.CameraTrack:
+                    raise TypeError(f'Pipeline {pipeline_name} last output data type not fit')
+
+                pipeline_shared_data = self.data_hub.dict_shared_data[pipeline_name]
+
+                b_read_result = True
+
+                image_info = pipeline_shared_data[E_PipelineSharedDataName.TrackedImageInfo.name].get()
+                if isinstance(image_info, numpy.ndarray):
+                    image_info = image_info.tolist()
+                elif image_info is None:
+                    image_info = self.cur_image_info
+                self.cur_image_info = image_info
+
+                objects_result = final_result_port.read()
+                if objects_result is None:
+                    b_read_result = False
+
+                if b_read_result:
+                    timestamp_image = image_info[1]
+                    self.logger.debug(f'Read objects result form camera {pipeline_name} '
+                                      f'@ image timestamp {timestamp_image}')
+                    timestamp = objects_result[0]
+                    frame = objects_result[1]
+                    subframe = objects_result[2]
+                    objects_result_content = objects_result[3]
+
+                    local_timestamp = (time.time() + self.dt_base) * 1000
+                    print(f'dt camera image match get: {pipeline_name} : {local_timestamp - timestamp}')
+
+                    if not isinstance(objects_result_content,
+                                      dict_OutputPortDataType[E_OutputPortDataType.CameraTrack.name][2]):
+                        self.logger.debug(f'Read none data from camera {pipeline_name}')
+                        break
+
+                    camera_transform = self.compare_timestamp_get_transform(pipeline_name, timestamp_image)
+                    if isinstance(camera_transform, numpy.ndarray):
+                        self.matchor.camera_transform_dict[pipeline_name] = camera_transform
+                        self.logger.debug(f'Set matchor camera transform from camera {pipeline_name}')
+                    else:
+                        self.logger.debug(f'Get transform from camera {pipeline_name} fail')
+                        break
+
+                    if pipeline_name == list(self.port_dict.keys())[0]:
+                        match_result = numpy.copy(objects_result_content)
+                        self.matchor.baseline_camera_transform = camera_transform
+                        self.matchor.baseline_result = match_result
+                        global_position = numpy.copy(objects_result_content)
+                        global_position.fill(0)
+                        self.logger.debug(f'Set matchor baseline object result')
+
+                    else:
+                        global_position: numpy.ndarray
+                        match_result, global_position_thiscamera = \
+                            self.matchor.get_match_result(pipeline_name, objects_result_content)
+                        mask_c = numpy.where(global_position_thiscamera[:, :, 3] == 1, 1, 0)
+                        mask_all = numpy.where(global_position[:, :, 3] == 1, 1, 0)
+                        new = mask_c - (mask_c * mask_all)
+                        n_new = numpy.nonzero(new)
+                        if n_new and len(n_new[0]):
+                            global_position[n_new] = global_position_thiscamera[n_new]
+                            pass
+
+                else:
+                    self.logger.debug(f'No camera {pipeline_name} track data')
+                    if pipeline_name == list(self.port_dict.keys())[0]:
+                        break
+                    else:
+                        continue
+
+                t_match_each_end = time.perf_counter()
+                fps = 1 / (t_match_each_end - t_match_each_start)
+                result_frame = convert_numpy_to_dict(match_result, frame, subframe, fps)
+
+                save_dir = self.results_save_dir[pipeline_name]
+                self.save_result_to_file(save_dir, result_frame)
+
+            self.match_times += 1
+
+            if isinstance(global_position, numpy.ndarray):
+                if self.output_port.size() >= self.output_buffer:
+                    self.output_port.read()
+                self.logger.debug(f'Send data to next')
+                self.output_port.send((timestamp, frame, subframe, global_position))
+                # print(global_position[numpy.nonzero(global_position)])
+                self.send_time = time.perf_counter()
 
     def run_end(self) -> None:
         self.logger.info('-' * 5 + 'Multi Camera Match Finished' + '-' * 5)

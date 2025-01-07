@@ -1,4 +1,5 @@
 import os
+import time
 
 from .._masterclass import PostProcess
 from src.multiprocess_pipeline.process import E_pipeline_branch
@@ -26,6 +27,10 @@ class GloResultsVisualizeProcess(PostProcess):
                 [E_pipeline_branch.consumer.name].items():
             if isinstance(process_result_dir, dict):
                 for k, each_dir in process_result_dir.items():
+                    each_producer_dict = self.data_hub.dict_process_results_dir[k][E_pipeline_branch.producer.name]
+                    each_producer_dict: dict
+                    if E_Process_Producer.ImageLoader.name not in each_producer_dict.keys():
+                        continue
                     each_frame_dir = self.data_hub.dict_process_results_dir[k] \
                         [E_pipeline_branch.producer.name][E_Process_Producer.ImageLoader.name]
                     each_result = os.path.join(each_dir, wr.Dict_text_result_name[wr.E_text_result_type.raw])
@@ -39,10 +44,6 @@ class GloResultsVisualizeProcess(PostProcess):
 
     def run_action(self) -> None:
         super().run_action()
-
-        while self.data_hub.dict_bLoadingFlag[self.pipeline_name].value:
-            pass
-
         self.logger.info(f'Start global post saving')
         each_post: BasePost
         for each_post in self.post_process_list:

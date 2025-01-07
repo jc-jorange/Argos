@@ -8,7 +8,7 @@ class BaseMatchor:
     def __init__(self,
                  intrinsic_parameters_dict,
                  max_range=10000,
-                 threshold=1):
+                 threshold=100):
         super().__init__()
 
         # intrinsic_parameters_dict = {camera_key: Intrinsic Parameters Numpy Matrix}
@@ -32,7 +32,5 @@ class BaseMatchor:
         ...
 
     def get_match_result(self, camera_name, predict_result) -> (S_Match_point, S_Match_point):
-        if not isinstance(self.baseline_result_in_camera, S_Match_point):
-            self.baseline_result_in_camera = self.get_baseline_result()
-
+        self.baseline_result_in_camera = self.get_baseline_result()
         return self.match_content(camera_name, predict_result)

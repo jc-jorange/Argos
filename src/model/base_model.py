@@ -172,7 +172,7 @@ class BaseModel(nn.Module):
             return head.head_factory_[model_name](
                 num_max_classes=self.classes_max_num,
                 num_max_ids=self.objects_max_num,
-                input_dim=self.input_info[E_arch_position.head.name][E_model_part_input_info.input_dim],
+                input_dim=self.input_info[E_arch_position.head.name][E_model_part_input_info.input_dim.name],
                 **arg)
 
         elif part_name == E_arch_position.backbone_with_neck.name:  # Backbone_with_Neck
@@ -183,7 +183,7 @@ class BaseModel(nn.Module):
 
         elif part_name == E_arch_position.neck.name:  # Neck
             return neck.neck_factory_[model_name](
-                input_dim=self.input_info[E_arch_position.neck.name][E_model_part_input_info.input_dim],
+                input_dim=self.input_info[E_arch_position.neck.name][E_model_part_input_info.input_dim.name],
                 **arg
             )
 
@@ -198,8 +198,8 @@ class BaseModel(nn.Module):
         results = list(net(x))
 
         self.input_info[name] = dict()
-        self.input_info[name][E_model_part_input_info.input_dim] = [result.size()[1] for result in results]
-        self.input_info[name][E_model_part_input_info.scale] = [int(input_size / result.size()[2]) for result in results]
+        self.input_info[name][E_model_part_input_info.input_dim.name] = [result.size()[1] for result in results]
+        self.input_info[name][E_model_part_input_info.scale.name] = [int(input_size / result.size()[2]) for result in results]
 
         del net, x
         torch.cuda.empty_cache()

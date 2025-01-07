@@ -30,10 +30,11 @@ class CamTransFileLoader(BaseCameraTransLoader):
         self.len = len(self.trans)
         assert self.len > 0, f'No Camera Transform found in {self.source}'
 
-    def read_trans(self, idx) -> (int, str, np.ndarray):
-        super(CamTransFileLoader, self).read_trans(idx)
+    def read_action(self, idx) -> (int, str, np.ndarray):
+        super(CamTransFileLoader, self).read_action(idx)
 
         trans = self.trans[idx]
+        trans = np.asarray(trans)
         timestamp = self.timestamp[idx]
 
         return timestamp, self.source, trans
@@ -42,4 +43,4 @@ class CamTransFileLoader(BaseCameraTransLoader):
         super(CamTransFileLoader, self).__next__()
         if self.count == len(self):
             raise StopIteration
-        return self.read_trans(self.count - 1)
+        return self.read_action(self.count - 1)

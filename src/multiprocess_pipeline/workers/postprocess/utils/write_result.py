@@ -1,8 +1,14 @@
 import os
+import traceback
+
 import cv2
 import numpy as np
 from enum import Enum, unique
 from collections import defaultdict
+from tqdm import tqdm
+
+from src.utils.logger import ALL_LoggerContainer
+from multiprocessing import current_process
 
 # {frame: {subframe: ({class: {ID: ((tlwh), score)}}, fps)}}
 S_default_save = {0: {0: ({0: {0: ((0, 0, 0, 0), 0.0)}}, 0.0)}}
@@ -73,12 +79,6 @@ def plot_tracks(
         frame: int,
 ):
     """
-    :rtype:
-    :param image:
-    :param result_by_class:
-    :param frame:
-    :param subframe:
-    :param fps:
     :return:
     """
 
@@ -129,10 +129,11 @@ def plot_tracks(
                         last_point = (int(last_result[0]), int(last_result[1]))
                         cv2.arrowedLine(
                             img=img,
-                            pt1=int_box[0:2],
-                            pt2=last_point,
+                            pt1=last_point,
+                            pt2=int_box[0:2],
                             color=color,
-                            thickness=line_thickness,
+                            thickness=int(line_thickness*0.5),
+                            tipLength=1
                         )
                     except (KeyError, IndexError):
                         cv2.circle(
@@ -170,7 +171,7 @@ def plot_tracks(
                         (0, 255, 255),  # cls_id: yellow
                         thickness=text_thickness
                     )
-        result_last_subframe = result_subframe[0]
+        result_last_subframe = result_class
 
     return img
 
@@ -190,8 +191,12 @@ def write_results_to_text(
     except KeyError as e:
         raise e
 
+    process_name = current_process().name
+    logger = ALL_LoggerContainer.get_logger(process_name)
+
     file_dir = os.path.join(output_dir, Dict_text_result_name[data_type])
 
+    logger.debug('start writing')
     last_line = None
     with open(file_dir, 'a') as f:
         for frame, result_subframe in results_dict.items():
@@ -216,11 +221,18 @@ def write_results_to_text(
                                 score=score,  # detection score
                                 fps=fps
                             )
+                            logger.debug(f'Saving line {line}')
                             if last_line != line:
                                 f.write(line)
+            else:
+                logger.debug('Pass frame 0 saving')
+    logger.debug('write to file finished')
 
 
 def write_results_to_video(result_root, frame_dir, video_type, frame_rate):
+    process_name = current_process().name
+    logger = ALL_LoggerContainer.get_logger(process_name)
+
     output_video_path = os.path.join(result_root, Str_video_result_name)
     ini_img_dir = os.path.join(frame_dir, os.listdir(frame_dir)[0])
     ini_img = cv2.imread(ini_img_dir)
@@ -228,11 +240,22 @@ def write_results_to_video(result_root, frame_dir, video_type, frame_rate):
     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*video_type), frame_rate, res)
     img_list = os.listdir(frame_dir)
     img_list.sort()
-    for each_img in img_list:
-        if each_img.endswith('.jpg'):
-            img_dir = os.path.join(frame_dir, each_img)
 
-            img = cv2.imread(img_dir)
-            video.write(img)
+    logger.info(f'Start saving images to video on {output_video_path}')
+
+    with tqdm(total=len(img_list)) as save_bar:
+        save_bar.set_description(f'Saving images to video')
+        for each_img in img_list:
+            try:
+                if each_img.endswith('.jpg'):
+                    img_dir = os.path.join(frame_dir, each_img)
+
+                    img = cv2.imread(img_dir)
+                    video.write(img)
+
+                    save_bar.update(1)
+            except Exception as e:
+                logger.warning(e)
 
     video.release()
+    logger.info(f'Video saving finished')

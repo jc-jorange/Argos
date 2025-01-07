@@ -41,3 +41,6 @@ class SharedDataHub:
         self.dict_bLoadingFlag = {
             pipeline_name: mp.Value('b', 1) for pipeline_name in pipeline_cfg.keys()
         }
+
+        self.array_schedule_gpu = mp.Array('i', 2)
+        self.array_schedule_gpu[0] = -1

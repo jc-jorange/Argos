@@ -18,6 +18,7 @@ class ConsumerProcess(BaseProcess):
         self.check_results_save_type(self.results_save_type)
 
         self.output_port = Struc_ConsumerOutputPort(self.opt,
+                                                    self.name,
                                                     self.output_type,
                                                     self.output_data_type,
                                                     self.data_shape)

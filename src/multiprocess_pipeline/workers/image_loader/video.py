@@ -35,7 +35,7 @@ class VideoDataLoader(BaseImageLoader):
         img_path = str(idx)
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         res, img_0 = self.cap.read()   # BGR
-        assert img_0 is not None, f'Failed to load frame {img_path}'
+        # assert img_0 is not None, f'Failed to load frame {img_path}'
 
         if self.timestamp:
             timestamp = self.timestamp[idx]
@@ -43,5 +43,4 @@ class VideoDataLoader(BaseImageLoader):
             timestamp = math.floor(time.time() * 1000)
             self.timestamp_cap[idx] = timestamp
 
-        self.image_shape = img_0.shape
         return timestamp, img_path, img_0

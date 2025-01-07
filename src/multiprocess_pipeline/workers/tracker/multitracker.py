@@ -1,6 +1,8 @@
 from collections import deque, defaultdict
 import multiprocessing as mp
 
+import torch.jit
+
 from src.utils.logger import ALL_LoggerContainer
 from src.model.base_model import BaseModel, load_model
 from src.model.utils.decode import mot_decode
@@ -263,8 +265,10 @@ class MCJDETracker(object):
                  model_weight: str,
                  conf_thres: float,
                  track_buffer: int,
+                 idx: int,
                  frame_rate=30):
         self.opt = opt
+        self.pipeline_idx = idx
 
         self.conf_thres = conf_thres
 
@@ -275,7 +279,16 @@ class MCJDETracker(object):
         self.info_data = self.model.info_data
         self.model = load_model(self.model, model_weight)  # load specified checkpoint
         self.model = self.model.to(opt.device)
+        if self.opt.half_precision:
+            self.model.half()
+        if self.opt.quantization:
+            self.model = torch.quantization.quantize_dynamic(self.model, {torch.nn.Linear}, dtype=torch.qint8)
+        self.model.share_memory()
         self.model.eval()
+
+        self.stream = None
+        if self.opt.cuda_stream:
+            self.stream = torch.cuda.Stream(priority=-self.pipeline_idx)
 
         # ----- track_lets
         self.tracked_tracks_dict = defaultdict(list)  # value type: list[STrack]
@@ -365,8 +378,8 @@ class MCJDETracker(object):
         c = np.array([width * 0.5, height * 0.5], dtype=np.float64)  # image center
         s = max(float(net_width) / float(net_height) * height, width) * 1.0
 
-        h_out = net_height // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][0]
-        w_out = net_width // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][0]
+        h_out = net_height // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][0]
+        w_out = net_width // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][0]
 
         # ----- get detections
         with torch.no_grad():
@@ -428,8 +441,8 @@ class MCJDETracker(object):
 
         c = np.array([width * 0.5, height * 0.5], dtype=np.float64)
         s = max(float(net_width) / float(net_height) * height, width) * 1.0
-        h_out = net_height // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
-        w_out = net_width // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
+        h_out = net_height // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][-1]
+        w_out = net_width // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][-1]
 
         meta = {'c': c, 's': s,
                 'out_height': h_out,
@@ -437,7 +450,12 @@ class MCJDETracker(object):
 
         ''' Step 1: Network forward, get detections & embeddings'''
         with torch.no_grad():
-            output = self.model.forward(im_blob)[-1]
+            if self.stream:
+                with torch.cuda.stream(self.stream):
+                    output = self.model.forward(im_blob)[-1]
+                torch.cuda.synchronize()
+            else:
+                output = self.model.forward(im_blob)[-1]
 
             hm = output['hm'].sigmoid_()
             wh = output['wh']
@@ -469,8 +487,11 @@ class MCJDETracker(object):
 
         # translate and scale
         # dets = map2orig(dets, h_out, w_out, height, width, self.info_data.classes_max_num)
-        dets = self.post_process(dets, meta)
-        dets = self.merge_outputs([dets])
+        try:
+            dets = self.post_process(dets, meta)
+            dets = self.merge_outputs([dets])
+        except:
+            pass
 
         # ----- parse each object class
         for cls_id in range(self.info_data.classes_max_num):  # cls_id start from 0

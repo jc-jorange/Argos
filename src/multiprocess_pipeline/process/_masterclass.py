@@ -2,6 +2,8 @@ import ctypes
 import os
 from multiprocessing import Process, Value
 from enum import Enum, unique
+import ntplib
+import time
 
 from src.utils.logger import ALL_LoggerContainer
 from src.multiprocess_pipeline.workers.tracker.utils.utils import mkdir_if_missing
@@ -30,13 +32,17 @@ class BaseProcess(Process):
     def __init__(self,
                  data_hub,
                  pipeline_name: str,
+                 pipeline_index: int,
                  opt,
+                 output_to_screen=True,
                  ) -> None:
         super(BaseProcess, self).__init__()
 
         self.data_hub = data_hub
         self.pipeline_name = pipeline_name
+        self.pipeline_index = pipeline_index
         self.opt = opt
+        self.output_to_screen = output_to_screen
 
         self.main_save_dir = self.making_dir(self.opt.save_dir, self.pipeline_name, self.dir_name)
         self.results_save_dir = self.making_dir(self.main_save_dir, name_Process_Result_dir)
@@ -45,6 +51,16 @@ class BaseProcess(Process):
             self.results_save_dir = {self.pipeline_name: self.results_save_dir}
 
         self.name = self.prefix + self.pipeline_name
+
+        try:
+            ntp_client = ntplib.NTPClient()
+            response = ntp_client.request("pool.ntp.org")
+            time_base_ntp = response.tx_time
+        except:
+            time_base_ntp = time.time()
+        time_base_local = time.time()
+        self.dt_base = time_base_ntp - time_base_local
+        self.timestamp = 0
 
         self.logger = None
 
@@ -71,7 +87,8 @@ class BaseProcess(Process):
         super(BaseProcess, self).run()
 
         self.logger = ALL_LoggerContainer.add_logger(self.name)
-        ALL_LoggerContainer.add_stream_handler(self.name)
+        if self.output_to_screen:
+            ALL_LoggerContainer.add_stream_handler(self.name)
         log_level = 'debug' if self.opt.debug else 'info'
         ALL_LoggerContainer.set_logger_level(self.name, log_level)
         self.logger.info(f'set log level to {log_level}')
@@ -92,6 +109,10 @@ class BaseProcess(Process):
 
     def ready_finished(self) -> bool:
         return self._b_finished
+
+    def get_current_timestamp(self) -> int:
+        self.timestamp = int((time.time() + self.dt_base) * 1000)
+        return self.timestamp
 
     @staticmethod
     def making_dir(*args) -> str:

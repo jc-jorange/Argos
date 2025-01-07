@@ -6,10 +6,13 @@ class BaseImageLoader:
     def __init__(self,
                  data_path: str,
                  normalized_image_shape: tuple,
-                 timestamp_path=''):
+                 timestamp_path='',
+                 with_flag=True,
+                 ):
         self.data_path = data_path
         self.timestamp_path = timestamp_path
         self.normalized_image_shape = normalized_image_shape
+        self.bWith_Flag = with_flag
 
         self.image_shape = (0, 0)
 
@@ -19,7 +22,8 @@ class BaseImageLoader:
     def read_image(self, idx) -> (int, str, np.ndarray, tuple):
         timestamp, img_path, img_0 = self.read_action(idx)
 
-        if img_0 is not None:
+        if isinstance(img_0, np.ndarray):
+            self.image_shape = img_0.shape
             # Padded resize
             img, _, _, _ = letterbox(img_0, self.normalized_image_shape)
 
@@ -31,7 +35,10 @@ class BaseImageLoader:
             return timestamp, img_path, img_0, img
 
         else:
-            raise StopIteration
+            if self.count >= len(self):
+                raise StopIteration
+            else:
+                self.__next__()
 
     def read_action(self, idx) -> (int, str, np.ndarray):
         return 0, '', np.ndarray
@@ -76,8 +83,8 @@ def letterbox(img,
     left, right = round(dw - 0.1), round(dw + 0.1)
 
     # resized, no border
-    img = cv2.resize(img, new_shape, interpolation=cv2.INTER_AREA)
+    scaled_img = cv2.resize(img, new_shape, interpolation=cv2.INTER_LINEAR)
     # padded rectangular
-    img = cv2.copyMakeBorder(img, top, bottom, left, right,
+    padded_img = cv2.copyMakeBorder(scaled_img, top, bottom, left, right,
                              cv2.BORDER_CONSTANT, value=color)
-    return img, ratio, dw, dh
+    return padded_img, ratio, dw, dh

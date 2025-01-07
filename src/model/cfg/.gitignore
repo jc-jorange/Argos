@@ -1,0 +1,8 @@
+*
+
+!DLA34_mot.yml
+!DLA34_mot_8class.yml
+!ShuffleNetV2_1.5x+DLAFusion_mot_8class.yml
+!ShuffleNetV2_1.5x+GhostPAN_mot_8class.yml
+
+!.gitignore

@@ -5,17 +5,13 @@ import time
 class BaseDataSender:
     def __init__(self,
                  target,
-                 *args,
-                 **kwargs):
+                 with_flag=True,
+                 ):
         self.target = target
+        self.bWith_Flag = with_flag
 
         self.target_object = None
         self.count = 0
-        self.timestamp = 0
 
-    def get_current_timestamp(self) -> int:
-        self.timestamp = int(round(time.time() * 1000))
-        return self.timestamp
-
-    def send_data(self, data: np.ndarray) -> bool:
+    def send_action(self, timestamp: int, data: np.ndarray) -> bool:
         return False

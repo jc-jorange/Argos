@@ -17,14 +17,15 @@ class BaseMultiCameraMatchor(BaseMatchor):
     @staticmethod
     def get_point_in_world_coord(t: np.ndarray, p: np.ndarray) -> np.ndarray:
         p[-1] = 1.0
+        p[1] = -p[1]
         t = np.matrix(t)
-        t_i = t.I
-        return t_i @ p
+        return t @ p
 
-    def convert_predict_to_camera_coord(self, camera_name, predict_result):
+    def convert_predict_to_world_coord(self, camera_name, predict_result):
         intrinsic_parameters = self.intrinsic_parameters_dict[camera_name]
         camera_transform = self.camera_transform_dict[camera_name]
-        predict_result_in_camera_coord = np.zeros(
+        # print(camera_transform)
+        predict_result_in_world_coord = np.zeros(
             (predict_result.shape[0], predict_result.shape[1], predict_result.shape[2])  # [class,id,[x,y,z,1]]
         )
 
@@ -37,13 +38,15 @@ class BaseMultiCameraMatchor(BaseMatchor):
 
             coord_b_in_camera_coord = self.get_point_in_camera_coord(intrinsic_parameters, coord_predict)
             coord_b_in_world_coord = self.get_point_in_world_coord(camera_transform, coord_b_in_camera_coord)
-            predict_result_in_camera_coord[class_predict, id_predict] = np.squeeze(coord_b_in_world_coord.T)
-            # print(f'idx: {camera_id} ', f'class: {class_predict} ', f'id: {id_predict} ', f'coord: {coord_b_in_camera_coord}')
+            predict_result_in_world_coord[class_predict, id_predict] = np.squeeze(coord_b_in_world_coord.T)
+            # print(f'idx: {camera_name} ', f'class: {class_predict} ', f'id: {id_predict} ',
+            #       f'raw: {coord_predict}', f'camera_coord: {coord_b_in_camera_coord}',
+            #       f'w_coord: {coord_b_in_world_coord}')
 
-        return predict_result_in_camera_coord
+        return predict_result_in_world_coord
 
     def get_baseline_result(self) -> S_Match_point:
         super().get_baseline_result()
         baseline_name = list(self.camera_transform_dict.keys())[0]
-        result = self.convert_predict_to_camera_coord(baseline_name, self.baseline_result)
+        result = self.convert_predict_to_world_coord(baseline_name, self.baseline_result)
         return result

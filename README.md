@@ -296,24 +296,24 @@ In this project, we use a multiprocess based configurable pipeline system for an
     FuncTest_1:
       producer:
         ImageLoader:
-          image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
+          image_path: "D:\\Output\\TestVideos\\Test_01.mp4"
           loader: Video
           normalized_image_shape: [ 3, 608, 1088 ]
-
+    
       consumer:
         Track:
-          arch: DLA+GhostPAN_mot_8class
-          load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+          arch: ShuffleNetV2_1.5x+DLAFusion_mot_8class
+          load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-22-38-58\ShuffleNetV2_1.5x+DLAFusion_mot_8class.pth
           conf_thres: 0.4
           track_buffer: 30
-
+    
         PathPredict:
           predictor_name: HermiteSpline
-
+    
       post:
         IndiResultsVisual:
           output_format: video
-
+    
       static_shared_value:
         CamIntrinsicPara:
           data_type: SharedArray_Float
@@ -321,6 +321,7 @@ In this project, we use a multiprocess based configurable pipeline system for an
           data_value: [ [ 11.11, 0., 128.0, 0 ],
                         [ 0, 11.11, 128.0, 0 ],
                         [ 0, 0, 1.0000, 0 ] ]
+
     ```
     - First hierarchy is the pipeline name, here is `FuncTest_1`.
     - `producer` contain all producer processes and their own arguments, here we have `ImageLoader`.
@@ -380,25 +381,21 @@ In this project, we use a multiprocess based configurable pipeline system for an
 - ### Model
     We use a simple swappable module system to develop tracking networks. All model configure files are default in `./src/model/cfg`.
     
-    Here is an example model configure file `DLA+GhostPAN_mot_8class.yml`:
+    Here is an example model configure file `ShuffleNetV2_1.5x+DLAFusion_mot_8class.yml`:
     ``` yaml
-    _description: ''
+    head:
+      model_name: 'FairMOT'
+      cfg_name: 'default'
+      _description: ''
     backbone:
       _description: ''
-      cfg_name: default
-      model_name: DLA
-    backbone_with_neck:
-      _description: ''
-      cfg_name: ''
-      model_name: ''
+      cfg_name: '1.5x'
+      model_name: 'ShuffleNetV2'
     neck:
       _description: ''
-      cfg_name: default
-      model_name: Ghost_PAN
-    head:
-      _description: ''
-      cfg_name: default
-      model_name: FairMOT
+      cfg_name: 'default'
+      model_name: 'DLA_Fusion'
+    _description: ''
     max_classes_num: 8
     max_objects_num: 500
     ```
@@ -411,7 +408,7 @@ In this project, we use a multiprocess based configurable pipeline system for an
 - ### Train
     Please make sure you have finished <big>**Dataset Preparation**</big> and <big>**Model Configure**</big> before training.
     ```
-    python train.py --exp_id Train_Test --arch DLA34_mot_8class --data_cfg ./src/dataset/cfg/FunTest.json
+    python train.py --exp_id Train_Test --arch ShuffleNetV2_1.5x+DLAFusion_mot_8class --data_cfg ./src/dataset/cfg/FunTest.json
     ```
     here:
     - `--exp_id` as experiment name for example here I use `Train_Test`;  

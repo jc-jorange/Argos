@@ -22,25 +22,9 @@ class ImageLoaderProcess(ProducerProcess):
     log_name = 'Image_Loader_Log'
 
     shared_data = {
-        E_PipelineSharedDataName.ImageData.name: {
+        E_PipelineSharedDataName.Image.name: {
             E_SharedDataFormat.data_type.name: E_SharedSaveType.Queue,
-            E_SharedDataFormat.data_shape.name: (1,),
-            E_SharedDataFormat.data_value.name: 0
-        },
-        E_PipelineSharedDataName.FrameID.name: {
-            E_SharedDataFormat.data_type.name: E_SharedSaveType.Queue,
-            E_SharedDataFormat.data_shape.name: (1,),
-            E_SharedDataFormat.data_value.name: 0
-        },
-        E_PipelineSharedDataName.ImageOriginShape.name: {
-            E_SharedDataFormat.data_type.name: E_SharedSaveType.SharedArray_Int,
-            E_SharedDataFormat.data_shape.name: (3,),
-            E_SharedDataFormat.data_value.name: 0
-        },
-
-        E_PipelineSharedDataName.ImageTimestamp.name: {
-            E_SharedDataFormat.data_type.name: E_SharedSaveType.Queue,
-            E_SharedDataFormat.data_shape.name: (1,),
+            E_SharedDataFormat.data_shape.name: (1, ),
             E_SharedDataFormat.data_value.name: 0
         },
     }
@@ -52,6 +36,7 @@ class ImageLoaderProcess(ProducerProcess):
                  *args,
                  timestamp_path='',
                  load_buffer=8,
+                 show_image=False,
                  **kwargs,
                  ):
         super(ImageLoaderProcess, self).__init__(*args, **kwargs)
@@ -60,15 +45,17 @@ class ImageLoaderProcess(ProducerProcess):
         self.loader_name = loader
         self.timestamp_path = timestamp_path
         self.image_path = image_path
-        self.load_buffer = load_buffer
+        self.load_buffer = max(load_buffer, 1)
         self.normalized_image_shape = tuple(normalized_image_shape)
+        self.bshow_image = show_image
 
         if self.loader_name not in E_ImageLoaderName.__members__.keys():
             raise KeyError(f'loader {self.loader_name} is not a valid loader')
 
         self.count = 0
         self.load_time = 0.0
-        self.fps_cur = 0
+        self.fps_send = 0
+        self.fps_read = 0
         self.fps_avg = 0
 
     def run_begin(self) -> None:
@@ -90,50 +77,75 @@ class ImageLoaderProcess(ProducerProcess):
             t2 = time.perf_counter()
             dt = t2 - t1
             if dt >= 5:
-                self.logger.info(f'Waiting read @ {self.image_path}')
+                self.logger.info(f'Waiting read image @ {self.image_path}')
                 t1 = t2
+        self.logger.info(f'Finish initial read image @ {self.image_path}')
 
     def run_action(self) -> None:
         self.logger.info("Start loading images")
         start_time = time.perf_counter()
 
-        hub_image_data = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageData.name]
-        hub_image_origin_shape = \
-            self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageOriginShape.name]
-        hub_frame_id = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.FrameID.name]
-        hub_timestamp = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageTimestamp.name]
+        hub_image = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.Image.name]
 
         try:
+            t_read_start = time.perf_counter()
+
             for timestamp, path, img_0, img in self.data_loader:
-                t_each_start = time.perf_counter()
+                t_read_end = time.perf_counter()
+
+                if len(self.data_loader) > 1:
+                    total_image = len(self.data_loader)
+                    self.logger.info(f'loading image: ['
+                                     f'{(self.count / total_image):.2%}, '
+                                     f'{self.count}/{total_image}, '
+                                     f'{self.fps_avg:.2f} image/s'
+                                     f']')
+
                 self.count += 1
-                self.logger.debug(f'Read Img {int(self.data_loader.count)} from {path}')
-                # if not self.opt.realtime:
-                #     while hub_image_data.size() > self.load_buffer:
-                #         # hub_frame_id.get()
-                #         # hub_image_origin_shape.get()
-                #         # hub_image_data.get()
-                #         # hub_timestamp.get()
-                #         pass
+                self.logger.debug(f'Read Img {int(self.data_loader.count)} from {path} @ timestamp {timestamp}')
+                self.logger.debug(f'delta time as image loader get: {self.get_current_timestamp() - timestamp}')
+
+                while hub_image.size() > self.load_buffer:
+                    if not self.opt.realtime:
+                        pass
+                    else:
+                        tmp = hub_image.get()
+                        del tmp
+                        continue
+
+                if self.bshow_image and self.opt.allow_show_image:
+                    cv2.imshow('Image Loader ' + self.pipeline_name, img_0)
+                    cv2.waitKey(1)
+
+                t_send_start = time.perf_counter()
+
                 img = torch.from_numpy(img).unsqueeze(0).to(self.opt.device)
+                img.share_memory_()
+                if self.opt.half_precision:
+                    img = img.type(torch.HalfTensor).to(self.opt.device)
+                frame_id = int(self.data_loader.count)
+                img_shape = img_0.shape
 
-                hub_frame_id.set(int(self.data_loader.count))
-                hub_image_origin_shape.set(img_0.shape[:])
-                hub_image_data.set(img)
-                hub_timestamp.set(timestamp)
-                self.logger.debug(f'Set Img and timestamp')
+                image_data = (timestamp, frame_id, img_shape, img_0, img)  # frame, timestamp, original shape, img
 
-                t_each_end = time.perf_counter()
-                dt_each = t_each_end - t_each_start
-                dt_all = t_each_end - start_time
-                self.fps_cur = 1 / dt_each
+                hub_image.set(image_data)
+
+                t_send_end = time.perf_counter()
+                self.logger.debug(f'delta time as image loader send: {self.get_current_timestamp() - timestamp}')
+
+                dt_send = t_send_end - t_send_start
+                dt_read = t_read_end - t_read_start
+                dt_all = t_send_end - start_time
+                self.fps_send = 1 / dt_send
+                self.fps_read = 1 / dt_read
                 self.fps_avg = self.count / dt_all
 
                 if self.count % 10 == 0 and self.count != 0:
                     self.logger.info(
                         f'Reading frame count {self.count}: '
-                        f'average dps: {self.fps_avg:.2f}, '
-                        f'current dps: {self.fps_cur:.2f}; '
+                        f'average: {self.fps_avg:.2f} dps, '
+                        f'current read only: {self.fps_read:.2f} dps; '
+                        f'current send only: {self.fps_send:.2f} dps; '
                     )
 
                 cv2.imwrite(
@@ -141,6 +153,7 @@ class ImageLoaderProcess(ProducerProcess):
                     img_0
                 )
                 self.logger.debug(f'Save img {int(self.data_loader.count)} from {path}')
+                t_read_start = time.perf_counter()
 
         except:
             traceback.print_exc()

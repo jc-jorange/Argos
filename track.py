@@ -12,6 +12,7 @@ from src.utils.logger import ALL_LoggerContainer, logging
 from src.multiprocess_pipeline.process import ProducerProcess, ConsumerProcess, PostProcess
 from src.multiprocess_pipeline.process import E_pipeline_branch
 from src.multiprocess_pipeline.process import factory_process_all
+from src.multiprocess_pipeline.process.logger import LogSysUsageProcess
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 
@@ -58,8 +59,9 @@ def track(opt_data: argparse.Namespace,
     data_hub = SharedDataHub(opt_data.device, process_yaml)
 
     # Creating pipeline
+    all_processor_dict = {}
     track_main_logger.info(f'Start creating pipelines')
-    for pipeline_name, pipeline_branch in process_yaml.items():
+    for pipeline_index, (pipeline_name, pipeline_branch) in enumerate(process_yaml.items()):
         for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
             last_consumer_port = None
 
@@ -97,11 +99,14 @@ def track(opt_data: argparse.Namespace,
                     processor = factory_process_all[pipeline_branch_name][pipeline_leaf_name](
                         data_hub=data_hub,
                         pipeline_name=pipeline_name,
+                        pipeline_index=pipeline_index,
                         opt=opt_data,
                         **pipeline_kwargs,
                     )
                     processor.daemon = True
-                    processor.start()
+                    if pipeline_branch_name != E_pipeline_branch.post.name:
+                        processor.start()
+                        all_processor_dict.update({processor.name: processor.pid})
 
                     # producer branch post-process
                     if pipeline_branch_name == E_pipeline_branch.producer.name:
@@ -123,15 +128,27 @@ def track(opt_data: argparse.Namespace,
                     data_hub.dict_process_results_dir[pipeline_name][pipeline_branch_name][pipeline_leaf_name] \
                         = processor.results_save_dir
 
+    # start sys usage logger
+    logger_sys_usage = LogSysUsageProcess(
+        data_hub=data_hub,
+        pipeline_name="Track_Sys_log",
+        pipeline_index=-1,
+        opt=opt_data,
+        process_dict=all_processor_dict
+    )
+    logger_sys_usage.start()
+    logger_sys_usage.process_run_action()
+
     # actually run all processor
     for pipeline_name, pipeline_branch in pipeline_tree.items():
         for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
-            for pipeline_leaf_name, process in pipeline_leaf.items():
-                track_main_logger.info('-' * 5 + 'Starting '
-                                       f'Pipeline: {pipeline_name}, '
-                                       f'Sub-Processor: {pipeline_leaf_name} @ {pipeline_branch_name} '
-                                       + '-' * 5)
-                process.process_run_action()
+            if pipeline_branch_name != E_pipeline_branch.post.name:
+                for pipeline_leaf_name, process in pipeline_leaf.items():
+                    track_main_logger.info('-' * 5 + 'Starting '
+                                           f'Pipeline: {pipeline_name}, '
+                                           f'Sub-Processor: {pipeline_leaf_name} @ {pipeline_branch_name} '
+                                           + '-' * 5)
+                    process.process_run_action()
 
     # check all processor running
     b_check_sub = True
@@ -149,6 +166,30 @@ def track(opt_data: argparse.Namespace,
                         data_hub.dict_bLoadingFlag[pipeline_name].value = b_check_producer
                         if not b_check_producer:
                             process.kill()  # manually kill finished producer
+
+    # Start all post process
+    for pipeline_name, pipeline_branch in pipeline_tree.items():
+        for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+            for pipeline_leaf_name, process in pipeline_leaf.items():
+                if pipeline_branch_name == E_pipeline_branch.post.name:
+                    if not process.is_alive():
+                        process.start()
+                        process.process_run_action()
+
+    b_check_sub = True
+    while b_check_sub:
+        b_check_sub = False
+
+        for pipeline_name, pipeline_branch in pipeline_tree.items():
+            for pipeline_branch_name, pipeline_leaf in pipeline_branch.items():
+                for pipeline_leaf_name, process in pipeline_leaf.items():
+                    if pipeline_branch_name == E_pipeline_branch.post.name:
+                        b_check_sub = b_check_sub or process.is_alive()
+                        if not b_check_sub:
+                            process.kill()
+
+    while logger_sys_usage.is_alive():
+        pass
 
     track_main_logger.info('-' * 10 + 'Main Finished' + '-' * 10)
 

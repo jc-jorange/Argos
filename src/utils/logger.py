@@ -7,11 +7,25 @@ from __future__ import print_function
 import os
 import logging
 from yacs.config import CfgNode as CN
+import tkinter
 
 formatter = logging.Formatter(
     # fmt='%(asctime)s [%(levelname)s]: %(filename)s(%(funcName)s:%(lineno)s) >> %(message)s')
     # fmt='%(asctime)s %(processName)s[%(levelname)s]: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     fmt='%(asctime)s %(processName)s[%(levelname)s]: %(message)s')
+
+
+class CustomLogger(logging.Logger):
+    def __init__(self, name, window: tuple, level=0):
+        super(CustomLogger, self).__init__(name, level)
+        self.window = window
+
+    def _log(self, level, msg: str, args, exc_info=None, extra=None, stack_info=False, stacklevel=1) -> None:
+        super(CustomLogger, self)._log(level, msg, args, exc_info, extra, stack_info, stacklevel)
+        text_box = self.window[1]
+        text_box.insert(tkinter.END, msg + "\n")
+        text_box.see(tkinter.END)
+        text_box.update()
 
 
 class Logger_Container:
@@ -30,22 +44,28 @@ class Logger_Container:
         self.log_dir_dict = {}
         self.tensorboard_writer_dict = {}
 
-    def add_logger(self, logger_name: str) -> logging.Logger:
+    def add_logger(self, logger_name: str) -> CustomLogger:
         local_logger = self.get_logger(logger_name)
         if local_logger:
             local_logger.warning(f'Logger {logger_name} already exist in process:{os.getpid()}')
             return local_logger
         else:
-            local_logger = logging.getLogger(logger_name)
+            logger_window = tkinter.Tk()
+            logger_window.title(logger_name)
+            logger_window.protocol("WM_DELETE_WINDOW", lambda: None)
+            text = tkinter.Text(logger_window, width=200, height=30)
+            text.pack()
+            # local_logger = logging.getLogger(logger_name)
+            local_logger = CustomLogger(logger_name, (logger_window, text))
             self.logger_dict[logger_name] = local_logger
             return local_logger
 
-    def get_logger(self, logger_name: str) -> logging.Logger | None:
+    def get_logger(self, logger_name: str) -> CustomLogger | None:
         local = None
         try:
             local = self.logger_dict[logger_name]
         except KeyError:
-            pass
+            return local
         return local
 
     def add_tensorboard_writer(self, name: str, log_dir: str) -> None:

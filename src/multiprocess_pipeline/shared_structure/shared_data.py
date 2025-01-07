@@ -4,6 +4,7 @@ import torch
 from enum import Enum, unique
 import math
 from collections import Iterable
+import queue
 
 
 @unique
@@ -97,78 +98,109 @@ class Struc_SharedData:
     def __init__(self,
                  device: str,
                  output_format: dict_SharedDataInfoFormat):
+        self._bBeenSet = mp.Value('i', 1)
+        self.reset(output_format, device)
+
+    def reset(self, data_format, device):
         self.device = device
-        self._data = self._generate_output_value(output_format)
+        self._data = self._generate_output_value(data_format)
 
     def set(self, data_set) -> None:
-        data = self._data
-        data_type = self.data_type
+        if self.data_type == E_SharedSaveType.Queue:
+            self._data.put(data_set)
 
-        if data_type == E_SharedSaveType.Queue:
-            data.put(data_set)
+        elif self.data_type == E_SharedSaveType.Tensor:
+            new_data = data_set
+            if isinstance(new_data, torch.Tensor):
+                self._data[:] = new_data.clone()
+                self._data.to(new_data.device)
+                self.device = new_data.device
+            elif isinstance(new_data, np.ndarray):
+                self._data[:] = torch.from_numpy(new_data).clone()
+                self._data.to(self.device)
+                self._data.share_memory_()
+            else:
+                if isinstance(new_data, Iterable):
+                    new_data = np.asarray(data_set)
+                else:
+                    new_data = np.ones()
+                    new_data = new_data * data_set
+                self._data[:] = torch.from_numpy(new_data).clone()
+                self._data.to(self.device)
+                self._data.share_memory_()
+            self.data_shape = tuple(self._data.data.shape)
 
-        elif data_type == E_SharedSaveType.Tensor:
-            data[:] = data_set[:]
-
-        elif data_type == E_SharedSaveType.SharedArray_Int or \
-                data_type == E_SharedSaveType.SharedArray_Float:
+        elif self.data_type == E_SharedSaveType.SharedArray_Int or \
+                self.data_type == E_SharedSaveType.SharedArray_Float:
             data_set = np.asarray(data_set)
             data_set = data_set.flatten()
-            data[:] = data_set[:]
+            self._data[:] = data_set[:]
 
-        elif data_type == E_SharedSaveType.SharedValue_Int or \
-                data_type == E_SharedSaveType.SharedValue_Float:
-            data.value = data_set
+        elif self.data_type == E_SharedSaveType.SharedValue_Int or \
+                self.data_type == E_SharedSaveType.SharedValue_Float:
+            self._data.value = data_set
+
+        self._bBeenSet.value = 1
 
     def get(self) -> any:
-        data_type = self.data_type
-        data = self._data
-
-        if data_type == E_SharedSaveType.Queue:
-            if data.empty():
+        if self.data_type == E_SharedSaveType.Queue:
+            if self._data.empty():
+                self._bBeenSet.value = 0
                 return None
             else:
-                return data.get(block=False)
+                try:
+                    re_data = self._data.get(block=False)
+                    return re_data
+                except RuntimeError:  # CUDA error: invalid device context
+                    return None
+                except queue.Empty:
+                    return None
 
-        elif data_type == E_SharedSaveType.Tensor:
-            return data
+        elif self.data_type == E_SharedSaveType.Tensor:
+            if self._bBeenSet.value:
+                self._bBeenSet.value = 0
+                return self._data.data.clone()
+            else:
+                return None
 
-        elif data_type == E_SharedSaveType.SharedArray_Int or \
-                data_type == E_SharedSaveType.SharedArray_Float:
-            data = data[:]
-            data = np.asarray(data)
-            data = data.reshape(self.data_shape)
-            return data
+        elif self.data_type == E_SharedSaveType.SharedArray_Int or \
+                self.data_type == E_SharedSaveType.SharedArray_Float:
+            if self._bBeenSet.value:
+                data = self._data[:]
+                data = np.asarray(data)
+                data = data.reshape(self.data_shape)
+                self._bBeenSet.value = 0
+                return data
+            else:
+                return None
 
-        elif data_type == E_SharedSaveType.SharedValue_Int or \
-                data_type == E_SharedSaveType.SharedValue_Float:
-            return data.value
+        elif self.data_type == E_SharedSaveType.SharedValue_Int or \
+                self.data_type == E_SharedSaveType.SharedValue_Float:
+            if self._bBeenSet.value:
+                re_data = self._data.value
+                self._bBeenSet.value = 0
+                return re_data
+            else:
+                return None
 
         else:
             raise ValueError
 
     def clear(self) -> None:
-        data_type = self.data_type
-        data = self._data
-
-        if data_type == E_SharedSaveType.Queue:
-            data: mp.Queue
-            while data.qsize() > 0:
+        if self.data_type == E_SharedSaveType.Queue:
+            self._data: mp.Queue
+            while self._data.qsize() > 0:
                 try:
-                    data.get()
+                    self._data.get(block=False)
                 except RuntimeError:  # CUDA error: invalid device context
                     pass
-            data.close()
         else:
-            del data
+            del self._data
 
         torch.cuda.empty_cache()
 
     def size(self) -> int:
-        data_type = self.data_type
-        data = self._data
-
-        if data_type == E_SharedSaveType.Queue:
-            return data.qsize()
+        if self.data_type == E_SharedSaveType.Queue:
+            return self._data.qsize()
         else:
             return 1

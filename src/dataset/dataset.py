@@ -541,8 +541,8 @@ class TrainingDataset(LoadImagesAndLabels):
                 cls_id = int(labels[i][0])
                 labels[i, 1] += self.tid_start_idx_of_cls_ids[ds][cls_id]
 
-        output_h = imgs.shape[1] // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
-        output_w = imgs.shape[2] // self.info_data.input_info[E_arch_position(0).name][E_model_part_input_info(1)][-1]
+        output_h = imgs.shape[1] // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][-1]
+        output_w = imgs.shape[2] // self.info_data.input_info[E_arch_position.head.name][E_model_part_input_info.scale.name][-1]
 
         # actual target number in image
         num_objs = labels.shape[0]

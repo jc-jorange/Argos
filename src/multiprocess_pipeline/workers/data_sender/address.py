@@ -1,6 +1,6 @@
-import traceback
 import struct
 import time
+from datetime import datetime, timezone
 
 import numpy as np
 from enum import Enum, unique
@@ -35,6 +35,8 @@ class AddressDataSender(BaseDataSender):
 
         self.connect()
 
+        self.send_time = time.perf_counter()
+
     def connect(self):
         if self.connect_type == ESupportConnectionType.TCP.name:
             server_socket = socket(AF_INET, SOCK_STREAM)
@@ -48,13 +50,19 @@ class AddressDataSender(BaseDataSender):
         else:
             raise
 
+        self.ConnectionSocket.setblocking(False)
         self.ConnectionSocket.settimeout(60)
 
-    def send_data(self, data: np.ndarray) -> bool:
-        super(AddressDataSender, self).send_data(data)
-        time_stamp = self.get_current_timestamp()
-        data_send = struct.pack(f'{len(FLAG)}s', FLAG.encode('utf-8'))
-        data_send += struct.pack('Q', time_stamp)
+    def send_action(self, timestamp: int, data: np.ndarray) -> bool:
+        super(AddressDataSender, self).send_action(timestamp, data)
+        data_send = b''
+
+        if self.bWith_Flag:
+            data_flag = struct.pack(f'{len(FLAG)}s', FLAG.encode('utf-8'))
+            data_flag += struct.pack('Q', timestamp)
+            self.send_data(data_flag)
+        else:
+            data_send += struct.pack('Q', timestamp)
 
         # data format: (class, id , (xyza))
         if not isinstance(data, np.ndarray):
@@ -71,10 +79,19 @@ class AddressDataSender(BaseDataSender):
             a_i = data[class_i][id_i][3]
 
             data_send += struct.pack('IIffff', class_i, id_i, x_i, y_i, z_i, a_i)
+            print(f'send: {class_i, id_i, x_i, y_i, z_i, a_i}')
+        if data_send:
+            return self.send_data(data_send)
+        else:
+            return True
 
+    def send_data(self, data) -> bool:
+        self.send_time = time.perf_counter()
         if self.connect_type == ESupportConnectionType.UDP.name:
-            self.ConnectionSocket.sendto(data_send, self.address)
+            self.ConnectionSocket.sendto(data, self.address)
             return True
         elif self.connect_type == ESupportConnectionType.TCP.name:
-            self.ConnectionSocket.send(data_send)
+            self.ConnectionSocket.send(data)
             return True
+        else:
+            return False

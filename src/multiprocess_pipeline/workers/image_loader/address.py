@@ -1,4 +1,4 @@
-import traceback
+import time
 
 import cv2
 import numpy as np
@@ -11,7 +11,7 @@ from .utils import create_gamma_img
 
 
 FLAG_HEAD = 'I///'
-_udp_clip_num = 65536 - 32
+_udp_clip_num = 51200
 
 _bytes_num_flag_head = len(FLAG_HEAD)
 _bytes_num_timestamp = len(struct.pack('q', 0))
@@ -47,6 +47,8 @@ class AddressImageLoader(BaseImageLoader):
 
         self.width = 0
         self.height = 0
+        self.recv_timestamp = 0
+        self.data_count_total = 0
 
         self.misread_count = 0
 
@@ -77,7 +79,10 @@ class AddressImageLoader(BaseImageLoader):
             self.ConnectionSocket, address = server_socket.accept()
         elif self.connect_type == E_SupportConnectionType.UDP.name:
             server_socket = socket(AF_INET, SOCK_DGRAM)
-            server_socket.bind(self.address)
+            udp_address = ('', self.address[1])
+            if self.address[0] in ('127.0.0.1', 'localhost'):
+                udp_address = ('localhost', self.address[1])
+            server_socket.bind(udp_address)
             self.ConnectionSocket = server_socket
         else:
             raise
@@ -90,50 +95,16 @@ class AddressImageLoader(BaseImageLoader):
 
         self.ConnectionSocket.settimeout(1)
 
-        recv_timestamp = None
         img = None
 
         while self.b_socket_alive:
             try:
-                flag_data = self.ConnectionSocket.recv(_total_head_num)
-                if flag_data:
-                    flag_head, recv_timestamp, self.width, self.height, data_count_total = \
-                        struct.unpack(f'={_bytes_num_flag_head}sqIII', flag_data)
-                    flag_head = flag_head.decode("utf-8", "ignore")
-                    if flag_head == FLAG_HEAD:
-                        data_count = 0
-                        img_bytes = b''
-
-                        if self.connect_type == E_SupportConnectionType.TCP.name:
-                            while data_count < data_count_total:
-                                data = self.ConnectionSocket.recv(data_count_total)
-                                img_bytes += data
-                                data_count += len(data)
-                        elif self.connect_type == E_SupportConnectionType.UDP.name:
-                            total_count = data_count_total // _udp_clip_num
-                            left = data_count_total % _udp_clip_num
-                            for i in range(total_count):
-                                data, address = self.ConnectionSocket.recvfrom(_udp_clip_num)
-                                img_bytes += data
-                                data_count += len(data)
-                            if left > 0:
-                                data, address = self.ConnectionSocket.recvfrom(left)
-                                img_bytes += data
-                                data_count += len(data)
-                        try:
-                            img = np.asarray(bytearray(img_bytes))
-                            img = cv2.imdecode(img, cv2.IMREAD_COLOR) # BGR
-                            self.image_shape = img.shape
-                            return recv_timestamp, self.data_path, img
-                        except AttributeError:
-                            self.misread_count += 1
-                            pass
-
-                    elif not flag_head:
-                        self.b_socket_alive = False
-
-                else:
-                    self.b_socket_alive = False
+                if self.bWith_Flag:
+                    if not self.recv_flag():
+                        continue
+                self.recv_timestamp, img = self.recv_data()
+                if isinstance(img, np.ndarray):
+                    return self.recv_timestamp, self.data_path, img
 
             except timeout:
                 self.b_socket_alive = False
@@ -141,17 +112,67 @@ class AddressImageLoader(BaseImageLoader):
             except OSError:
                 pass
 
-        return recv_timestamp, self.data_path, img
+        return self.recv_timestamp, self.data_path, img
 
     def flush_listen(self) -> bool:
         self.ConnectionSocket.settimeout(0)
         while True:
             try:
-                data = self.ConnectionSocket.recv(40960)
-                if len(data) < 40960:
+                data = self.ConnectionSocket.recv(51200)
+                if len(data) < 51200:
                     return False
             except:
                 return False
+
+    def recv_flag(self) -> bool:
+        flag_data = self.ConnectionSocket.recv(_udp_clip_num)
+        if flag_data:
+            if len(flag_data) != _total_head_num:
+                return False
+            flag_head, self.recv_timestamp, self.width, self.height, self.data_count_total = \
+                struct.unpack(f'={_bytes_num_flag_head}sQIII', flag_data)
+            flag_head = flag_head.decode("utf-8", "ignore")
+            return flag_head and flag_head == FLAG_HEAD
+        else:
+            return False
+
+    def recv_data(self):
+        data_count = 0
+        img_bytes = b''
+        recv_timestamp = int(time.time() * 1000)
+        total_count_tmp = (self.data_count_total+8) if self.bWith_Flag else self.data_count_total
+
+        if self.connect_type == E_SupportConnectionType.TCP.name:
+            while data_count < total_count_tmp:
+                data = self.ConnectionSocket.recv(total_count_tmp)
+                img_bytes += data
+                data_count += len(data)
+
+        elif self.connect_type == E_SupportConnectionType.UDP.name:
+            total_count = total_count_tmp // _udp_clip_num
+            left = total_count_tmp % _udp_clip_num
+            for i in range(total_count):
+                data, address = self.ConnectionSocket.recvfrom(_udp_clip_num)
+                img_bytes += data
+                data_count += len(data)
+            if left > 0:
+                data, address = self.ConnectionSocket.recvfrom(left)
+                img_bytes += data
+                data_count += len(data)
+        try:
+            if self.bWith_Flag:
+                recv_timestamp = self.recv_timestamp
+
+            img = np.asarray(bytearray(img_bytes))
+            img = cv2.imdecode(img, cv2.IMREAD_COLOR)  # BGR
+            self.image_shape = img.shape
+            # t = time.time() * 1000
+            # print('end:', t - recv_timestamp)
+            return recv_timestamp, img
+
+        except AttributeError:
+            self.misread_count += 1
+            return None, None
 
     def __next__(self):
         timestamp, img_path, img_0, img = super(AddressImageLoader, self).__next__()

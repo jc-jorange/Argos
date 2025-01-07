@@ -1,4 +1,3 @@
-import traceback
 import struct
 import time
 
@@ -8,17 +7,17 @@ from socket import *
 
 from ._masterclass import BaseCameraTransLoader
 
-FLAG = 'C///'
+FLAG_HEAD = 'C///'
+_udp_clip_num = 64000
 
-_bytes_num_flag = len(FLAG)
+_bytes_num_flag_head = len(FLAG_HEAD)
 _bytes_num_timestamp = len(struct.pack('q', 0))
 _bytes_num_data_count = len(struct.pack('I', 0))
-_total_head_num = _bytes_num_flag + _bytes_num_timestamp + _bytes_num_data_count
-_udp_clip_num = 64000
+_total_head_num = _bytes_num_flag_head + _bytes_num_timestamp + _bytes_num_data_count
 
 
 @unique
-class ESupportConnectionType(Enum):
+class E_SupportConnectionType(Enum):
     TCP = 1
     UDP = 2
 
@@ -31,7 +30,7 @@ class AddressTransLoader(BaseCameraTransLoader):
 
         address_str_list = self.source.split(':')
         self.connect_type, ip, port = address_str_list[0], address_str_list[1], int(address_str_list[2])
-        assert ESupportConnectionType[self.connect_type], \
+        assert E_SupportConnectionType[self.connect_type], \
             f'None support connection type {self.connect_type}. Please check it.'
         self.address = (ip, port)
         self.len = 1
@@ -39,104 +38,140 @@ class AddressTransLoader(BaseCameraTransLoader):
         self.ConnectionSocket = None
         self.b_socket_alive = True
 
-        self.connect()
+        self.recv_timestamp = 0
+        self.data_count_total = 0
 
-        self.timestamp = []
-        self.trans = []
+        self.misread_count = 0
+
+    def pre_process(self) -> bool:
+        super(AddressTransLoader, self).pre_process()
+        if self.ConnectionSocket:
+            pass
+        else:
+            self.connect()
+
+        self.b_socket_alive = True
+        first_data = self.read_action(0)[0]
+        if first_data:
+            b_has_data = True
+            while b_has_data:
+                b_has_data = self.flush_listen()
+
+            return True
+        else:
+            return False
 
     def connect(self):
-        if self.connect_type == ESupportConnectionType.TCP.name:
+        if self.connect_type == E_SupportConnectionType.TCP.name:
             server_socket = socket(AF_INET, SOCK_STREAM)
             server_socket.bind(self.address)
             server_socket.listen()
 
             self.ConnectionSocket, address = server_socket.accept()
-        elif self.connect_type == ESupportConnectionType.UDP.name:
+        elif self.connect_type == E_SupportConnectionType.UDP.name:
             server_socket = socket(AF_INET, SOCK_DGRAM)
-            server_socket.bind(self.address)
+            udp_address = ('', self.address[1])
+            if self.address[0] in ('127.0.0.1', 'localhost'):
+                udp_address = ('localhost', self.address[1])
+            server_socket.bind(udp_address)
             self.ConnectionSocket = server_socket
         else:
             raise
 
+        self.ConnectionSocket.setblocking(False)
         self.ConnectionSocket.settimeout(60)
 
-    def read_trans(self, idx) -> (int, str, np.ndarray):
-        super(AddressTransLoader, self).read_trans(idx)
-        trans_path = self.source
-        trans = []
-        timestamp = time.time()
+    def read_action(self, idx) -> (int, str, np.ndarray):
+        super(AddressTransLoader, self).read_action(idx)
+        self.ConnectionSocket.settimeout(1)
 
-        if self.connect_type == ESupportConnectionType.UDP.name:
-            self.ConnectionSocket.setblocking(False)
-            self.ConnectionSocket.settimeout(1)
+        trans = None
+
+        while self.b_socket_alive:
             try:
-                clip_num = _udp_clip_num
-                flag_data, address = self.ConnectionSocket.recvfrom(_total_head_num)
-                if flag_data and FLAG in flag_data.decode("utf-8", "ignore"):
-                    flag = flag_data
-                    timestamp = int(flag[4:8])
-                    data_count_total = int(flag[-_bytes_num_data_count:])
-                    data_count = 0
-                    trans_bytes = b''
-
-                    if data_count_total > 0:
-                        total_count = data_count_total // clip_num
-                        left = data_count_total % clip_num
-                        for i in range(total_count):
-                            data, address = self.ConnectionSocket.recvfrom(clip_num)
-                            trans_bytes += data
-                            data_count += len(data)
-                        if left > 0:
-                            data, address = self.ConnectionSocket.recvfrom(left)
-                            trans_bytes += data
-                            data_count += len(data)
-
-                        try:
-                            for i in range(4*4):
-                                each_data = trans_bytes[i*4: (i+1)*4]
-                                each_data = struct.unpack('f', each_data)[0]
-                                trans.append(each_data)
-                        except:
-                            pass
-            except timeout or OSError:
-                self.b_socket_alive = False
-
-        elif self.connect_type == ESupportConnectionType.TCP.name:
-            try:
-                data = self.ConnectionSocket.recv(_bytes_num_flag)
-                if b'\x00\x00' in data:
+                if self.bWith_Flag:
+                    if not self.recv_flag():
+                        continue
+                self.recv_timestamp, trans = self.recv_data()
+                if isinstance(trans, np.ndarray):
+                    return self.recv_timestamp, self.source, trans
+                else:
                     pass
-                if data and data.decode("utf-8", "ignore") == FLAG:
-                    flag_data = self.ConnectionSocket.recv(_total_head_num - _bytes_num_flag)
-                    flag = flag_data.decode("utf-8", "ignore")
-                    timestamp = int(flag[0:_bytes_num_timestamp])
-                    data_count_total = int(flag[-_bytes_num_data_count:])
-                    data_count = 0
-                    trans_bytes = b''
 
-                    if data_count_total > 0:
-                        while data_count < data_count_total:
-                            data = self.ConnectionSocket.recv(data_count_total)
-                            trans_bytes += data
-                            data_count += len(data)
-
-                        for i in range(4 * 4):
-                            each_data = trans_bytes[i * 4: (i + 1) * 4]
-                            each_data = struct.unpack('f', each_data)[0]
-                            trans.append(each_data)
-                elif not data:
-                    self.b_socket_alive = False
-            except Exception:
-                traceback.print_exc()
+            except timeout:
                 self.b_socket_alive = False
 
-        assert trans is not None, f'Failed to load trans @{trans_path}'
-        trans = np.asarray(trans)
-        trans = trans.reshape((4, 4))
-        return timestamp, trans_path, trans
+            except OSError:
+                pass
+
+        return self.recv_timestamp, self.source, trans
+
+    def recv_flag(self) -> bool:
+        flag_data = self.ConnectionSocket.recv(_udp_clip_num)
+        if flag_data:
+            if len(flag_data) != _total_head_num:
+                return False
+            flag_head, self.recv_timestamp, self.data_count_total = \
+                struct.unpack(f'={_bytes_num_flag_head}sqI', flag_data)
+            flag_head = flag_head.decode("utf-8", "ignore")
+            return flag_head and flag_head == FLAG_HEAD
+        else:
+            return False
+
+    def recv_data(self) -> (int, list):
+        trans = []
+        data_count = 0
+        trans_bytes = b''
+        recv_timestamp = int(time.time() * 1000)
+        total_count_tmp = (self.data_count_total+8) if self.bWith_Flag else self.data_count_total
+
+        if self.connect_type == E_SupportConnectionType.TCP.name:
+            while data_count < total_count_tmp:
+                data = self.ConnectionSocket.recv(total_count_tmp)
+                trans_bytes += data
+                data_count += len(data)
+
+        elif self.connect_type == E_SupportConnectionType.UDP.name:
+            total_count = total_count_tmp // _udp_clip_num
+            left = total_count_tmp % _udp_clip_num
+            for i in range(total_count):
+                data, address = self.ConnectionSocket.recvfrom(_udp_clip_num)
+                trans_bytes += data
+                data_count += len(data)
+            if left > 0:
+                data, address = self.ConnectionSocket.recvfrom(left)
+                trans_bytes += data
+                data_count += len(data)
+        try:
+            if not self.bWith_Flag:
+                time_bytes_array = trans_bytes[:8]
+                recv_timestamp = struct.unpack('=Q', bytearray(time_bytes_array))
+                trans_bytes = trans_bytes[8:]
+
+            for i in range(4 * 4):
+                each_data = trans_bytes[i * 4: (i + 1) * 4]
+                each_data = struct.unpack('f', each_data)[0]
+                trans.append(each_data)
+            trans = np.asarray(trans)
+            trans = trans.reshape((4, 4))
+            return recv_timestamp, trans
+
+        except AttributeError:
+            self.misread_count += 1
+            return recv_timestamp, None
+
+    def flush_listen(self) -> bool:
+        self.ConnectionSocket.settimeout(0)
+        while True:
+            try:
+                data = self.ConnectionSocket.recv(51200)
+                if len(data) < 51200:
+                    return False
+            finally:
+                return False
 
     def __next__(self):
         super(AddressTransLoader, self).__next__()
         if not self.b_socket_alive:
             raise StopIteration
-        return self.read_trans(self.count)
+        return self.read_action(self.count)

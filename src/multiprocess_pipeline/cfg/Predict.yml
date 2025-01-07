@@ -1,48 +1,102 @@
-FuncTest_1:
+Finger_L_01:
   producer:
     ImageLoader:
-      image_path: "D:\\Library\\Experiment\\HandArm\\WithoutMoving\\Recent\\movies\\short\\Test_04.mp4"
-      loader: Video
+      image_path: "UDP:10.39.104.202:5101"
+      loader: Address
       normalized_image_shape: [ 3, 608, 1088 ]
+      load_buffer: 1
+      show_image: False
 
   consumer:
     Track:
-      arch: DLA34_mot_8class
-      load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-16-16-02\DLA34_mot_8class.pth
+      arch: ShuffleNetV2_1.5x+DLAFusion_mot_8class
+      load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-22-38-58\ShuffleNetV2_1.5x+DLAFusion_mot_8class.pth
       conf_thres: 0.4
       track_buffer: 30
+      show_image: False
 
-    PathPredict:
-      predictor_name: HermiteSpline
+#    PathPredict:
+#      predictor_name: LinearSpline
+#
+#    DataSmooth:
+#      smoother_name: KalmanFilter
+#      smoother_kwargs:
+#        r: 1.0e-2
+#        q: 1.0e-4
 
   post:
-    IndiResultsVisual:
-      output_format: video
+#    IndiResultsVisual:
+#      output_format: video
 
   static_shared_value:
     CamIntrinsicPara:
       data_type: SharedArray_Float
       data_shape: [ 3, 4 ]
-      data_value: [ [ 11.11, 0., 128.0, 0 ],
-                   [ 0, 11.11, 128.0, 0 ],
+      data_value: [ [ 497.77, 0, 320, 0 ],
+                   [ 0, 466.66, 200, 0 ],
                    [ 0, 0, 1.0000, 0 ] ]
 
-#FuncTest_2:
+Finger_R_01:
+  producer:
+    ImageLoader:
+      image_path: "UDP:10.39.104.202:5102"
+      loader: Address
+      normalized_image_shape: [ 3, 608, 1088 ]
+      load_buffer: 1
+      show_image: False
+
+  consumer:
+    Track:
+      arch: ShuffleNetV2_1.5x+DLAFusion_mot_8class
+      load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-22-38-58\ShuffleNetV2_1.5x+DLAFusion_mot_8class.pth
+      conf_thres: 0.4
+      track_buffer: 30
+      show_image: False
+
+#    PathPredict:
+#      predictor_name: LinearSpline
+#
+#    DataSmooth:
+#      smoother_name: KalmanFilter
+#      smoother_kwargs:
+#        r: 1.0e-2
+#        q: 1.0e-4
+
+  post:
+#    IndiResultsVisual:
+#      output_format: video
+
+  static_shared_value:
+    CamIntrinsicPara:
+      data_type: SharedArray_Float
+      data_shape: [ 3, 4 ]
+      data_value: [ [ 497.77, 0, 320, 0 ],
+                   [ 0, 466.66, 200, 0 ],
+                   [ 0, 0, 1.0000, 0 ] ]
+#
+#Finger_M_01:
 #  producer:
 #    ImageLoader:
-#      image_path: "D:\\Output\\OpenShot\\Old\\Test_01.mp4"
-#      loader: Video
+#      image_path: "UDP:10.39.104.202:5103"
+#      loader: Address
 #      normalized_image_shape: [ 3, 608, 1088 ]
+#      load_buffer: 2
 #
 #  consumer:
 #    Track:
-#      arch: DLA+GhostPAN_mot_8class
-#      load_model: D:\Project\PythonScripts\Argus\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
+#      arch: ShuffleNetV2_1.5x+DLAFusion_mot_8class
+#      load_model: D:\Project\PythonScripts\Argos\results\train_result\RealWorldExperiment\2024-07-22-22-38-58\ShuffleNetV2_1.5x+DLAFusion_mot_8class.pth
 #      conf_thres: 0.4
 #      track_buffer: 30
 #
-#    PathPredict:
-#      predictor_name: HermiteSpline
+##    DataSmooth:
+##      smoother_name: KalmanFilter
+##      smoother_kwargs:
+##        r: 1.0e-2
+##        q: 1.0e-2
+#
+##    PathPredict:
+##      predictor_name: LinearSpline
 #
 #  post:
 #    IndiResultsVisual:
@@ -52,43 +106,43 @@ FuncTest_1:
 #    CamIntrinsicPara:
 #      data_type: SharedArray_Float
 #      data_shape: [ 3, 4 ]
-#      data_value: [ [ 11.11, 0., 128.0, 0 ],
-#                   [ 0, 11.11, 128.0, 0 ],
+#      data_value: [ [ 497.77, 0, 320, 0 ],
+#                   [ 0, 466.66, 200, 0 ],
 #                   [ 0, 0, 1.0000, 0 ] ]
 
-#FuncTest_3:
-#  producer:
-#    ImageLoader:
-#      image_path: "UDP:127.0.0.1:6002"
-#      loader: Address
-#      normalized_image_shape: [ 3, 608, 1088 ]
-#
-#  consumer:
-#    Track:
-#      arch: DLA+GhostPAN_mot_8class
-#      load_model: D:\Project\PythonScripts\Argos\results\train_result\Experiment_02\DLA+GhostPAN_mot_8class\2024-03-08-03-19-33\DLA+GhostPAN_mot_8class.pth
-#      conf_thres: 0.4
-#      track_buffer: 30
-#
-#  post:
-#
-#  static_shared_value:
+FuncTest_Global:
+  producer:
+    CameraTransLoader:
+      loader: Address_All
+      load_buffer: 2
+#      source: 'UDP:127.0.0.1:5301'
+      source: 'UDP:10.39.104.202:5302'
+      loader_kwargs:
+        name_list:
+          - Finger_L_01
+          - Finger_R_01
+          - Finger_M_01
+        with_flag: True
+        transpose: False
 
-#FuncTest_Global:
-#  producer:
-#    CameraTransLoader:
-#      loader: Address_All
-#      source: 'UDP:127.0.0.1:7000'
-#      name_list:
-#        - FuncTest_1
-#        - FuncTest_2
-#
-#  consumer:
-#    MultiCameraIdMatch:
-#      matchor_name: CenterRayIntersect
-#
-#  post:
-#    GlobalResultsVisual:
-#      output_format: video
-#
-#  static_shared_value:
+  consumer:
+    MultiCameraIdMatch:
+      threshold: 10
+      matchor_name: CenterRayIntersect
+
+#    DataSmooth:
+#      smoother_name: KalmanFilter
+#      smoother_kwargs:
+#        r: 1.0e-2
+#        q: 1.0e-4
+
+    DataSend:
+      sender_name: Address
+      filter_name: FirstValid
+      send_target: "UDP:127.0.0.1:5401"
+
+  post:
+    GlobalResultsVisual:
+      output_format: video
+
+  static_shared_value:

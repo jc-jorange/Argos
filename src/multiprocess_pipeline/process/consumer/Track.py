@@ -1,12 +1,15 @@
+import cv2
 import numpy
 from enum import Enum, unique
+import torch
 
 from src.multiprocess_pipeline.shared_structure import E_SharedSaveType, E_OutputPortDataType,\
-    E_PipelineSharedDataName
+    E_PipelineSharedDataName, E_SharedDataFormat
 from . import ConsumerProcess
 from src.multiprocess_pipeline.workers.tracker.multitracker import MCJDETracker
 from src.multiprocess_pipeline.workers.postprocess.utils import write_result as wr
 from src.multiprocess_pipeline.workers.tracker.utils.timer import Timer
+from src.multiprocess_pipeline.workers.postprocess.utils.write_result import plot_tracks
 
 
 @unique
@@ -26,6 +29,14 @@ class TrackerProcess(ConsumerProcess):
     output_data_type = E_OutputPortDataType.CameraTrack
     output_shape = (1,)
 
+    shared_data = {
+        E_PipelineSharedDataName.TrackedImageInfo.name: {
+            E_SharedDataFormat.data_type.name: E_SharedSaveType.Queue,
+            E_SharedDataFormat.data_shape.name: (1,),
+            E_SharedDataFormat.data_value.name: 0
+        },  # [frame_id, timestamp, shape_x, shape_y]
+    }
+
     def __init__(self,
                  arch: str,
                  load_model: str,
@@ -33,12 +44,15 @@ class TrackerProcess(ConsumerProcess):
                  track_buffer: int,
                  *args,
                  min_box_area=10,
+                 show_image=False,
                  **kwargs):
         super().__init__(*args, **kwargs)
+        self.data_hub.array_schedule_gpu[0] = self.data_hub.array_schedule_gpu[0] + 1
+        self.gpu_schedule_index = self.data_hub.array_schedule_gpu[0]
 
         self.tracker = None
         self.info_data = None
-        self.all_frame_results = wr.S_default_save
+        self.all_frame_results = {}
         self.current_track_result = None
 
         self.arch = arch
@@ -46,6 +60,7 @@ class TrackerProcess(ConsumerProcess):
         self.conf_thres = conf_thres
         self.track_buffer = track_buffer
         self.min_box_area = min_box_area
+        self.bshow_image = show_image
 
         self.timer_loop = Timer()
         self.timer_track = Timer()
@@ -65,41 +80,57 @@ class TrackerProcess(ConsumerProcess):
                                     self.load_model,
                                     self.conf_thres,
                                     self.track_buffer,
+                                    self.pipeline_index,
                                     24)
         self.info_data = self.tracker.model.info_data
 
-        self.current_track_result = numpy.zeros([self.info_data.classes_max_num, self.info_data.objects_max_num, 4])
+        self.current_track_result = numpy.zeros([self.info_data.classes_max_num, self.info_data.objects_max_num*2, 4])
 
     def run_action(self) -> None:
         super(TrackerProcess, self).run_action()
         self.logger.info('Start tracking')
 
-        hub_image_data = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageData.name]
-        hub_image_origin_shape = \
-            self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.ImageOriginShape.name]
-        hub_frame_id = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.FrameID.name]
+        hub_image = self.data_hub.dict_shared_data[self.pipeline_name][E_PipelineSharedDataName.Image.name]
+        hub_tracked_info = self.data_hub.dict_shared_data[self.pipeline_name][
+            E_PipelineSharedDataName.TrackedImageInfo.name]
 
         hub_b_loading = self.data_hub.dict_bLoadingFlag[self.pipeline_name]
 
         origin_shape = (0, 0, 0)
+        schedule_index_next = 0
 
         while hub_b_loading.value:
             # loop timer start record
             self.timer_loop.tic()
 
-            input_frame_id = hub_frame_id.get()
-            img = hub_image_data.get()
-
-            if img == None:
+            image_data = hub_image.get()
+            if image_data is None:
                 continue
 
-            if not input_frame_id:
-                input_frame_id = 0
-            else:
-                self.logger.debug(f'Tracking Image @ frame {input_frame_id}')
+            if self.opt.GPU_load_sequence:
+                schedule_index_next = self.data_hub.array_schedule_gpu[1]
+                if schedule_index_next != self.gpu_schedule_index:
+                    continue
+
+            timestamp = image_data[0]
+            input_frame_id = image_data[1]
+            img_origin_shape = image_data[2]
+
+            img_0 = image_data[-2]
+            img = image_data[-1]
+
+            self.logger.debug(f'delta time as image track get: {self.get_current_timestamp() - timestamp}')
+
+            hub_tracked_info.set([input_frame_id, timestamp, img_origin_shape[0], img_origin_shape[1]])
+
+            if not (isinstance(img, numpy.ndarray) or isinstance(img, torch.Tensor)):
+                self.logger.debug(f'Not valid image data')
+                continue
+
+            self.logger.debug(f'Tracking Image @ frame {input_frame_id}')
 
             if self.frame_id == 0:
-                origin_shape = hub_image_origin_shape.get()
+                origin_shape = img_origin_shape
 
             # update frame id
             self.frame_id += 1
@@ -109,10 +140,16 @@ class TrackerProcess(ConsumerProcess):
             self.timer_track.tic()
 
             online_targets_dict = self.tracker.update_tracking(img, origin_shape)
+            del img
 
             self.timer_track.toc()
             self.logger.debug(f'Tracking time: {self.timer_track.diff} s')
             # -----
+
+            if self.opt.GPU_load_sequence:
+                schedule_index_next += 1
+                total_index = self.data_hub.array_schedule_gpu[0]
+                self.data_hub.array_schedule_gpu[1] = schedule_index_next if schedule_index_next <= total_index else 0
 
             result_per_subframe = {}
             total_track_count = 0
@@ -137,8 +174,14 @@ class TrackerProcess(ConsumerProcess):
             self.all_frame_results[input_frame_id] = {0: (result_per_subframe, self.fps_loop_avg)}
             self.logger.debug(f'Tracked {total_track_count} objects')
 
-            self.output_port.send((self.frame_id, 0, self.current_track_result))
-            self.logger.debug(f'Send track results to next')
+            if self.bshow_image and self.opt.allow_show_image:
+                show_img = plot_tracks(img_0, self.all_frame_results[input_frame_id], input_frame_id)
+                cv2.imshow('Track ' + self.pipeline_name, show_img)
+                cv2.waitKey(1)
+
+            self.output_port.send((timestamp, input_frame_id, 0, self.current_track_result))
+            self.logger.debug(f'Send track results to next at timestamp {self.get_current_timestamp()}')
+            self.logger.debug(f'delta time as image track send: {self.get_current_timestamp() - timestamp}')
 
             # loop timer end record
             self.timer_loop.toc()
@@ -149,8 +192,11 @@ class TrackerProcess(ConsumerProcess):
             self.fps_neuralnetwork_avg = self.frame_id / max(1e-5, self.timer_track.total_time)
             self.fps_neuralnetwork_current = 1.0 / max(1e-5, self.timer_track.diff)
 
-            self.save_result_to_file(self.results_save_dir, self.all_frame_results)
-            self.logger.debug(f'Save track results to file')
+            b_save = self.save_result_to_file(self.results_save_dir, self.all_frame_results)
+            if b_save:
+                self.logger.debug(f'Save track results to file {self.results_save_dir}')
+            else:
+                self.logger.info(f'SAVE RESULTS FAIL!!!!!')
             self.all_frame_results = {}
 
             if self.frame_id % 10 == 0 and self.frame_id != 0:

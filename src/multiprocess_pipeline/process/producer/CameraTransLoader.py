@@ -29,6 +29,7 @@ class CameraTransLoaderProcess(ProducerProcess):
                  source,
                  *args,
                  load_buffer=8,
+                 loader_kwargs={},
                  **kwargs,
                  ):
 
@@ -36,13 +37,13 @@ class CameraTransLoaderProcess(ProducerProcess):
             raise KeyError(f'loader {loader} is not a valid loader')
         self.loader = factory_camera_trans_loader[loader]
 
-        loader_kwargs = {}
-        tmp = inspect.signature(self.loader).bind(source, **kwargs)
-        tmp.apply_defaults()
-        tmp_keys = tmp.arguments.keys()
-        for k in tmp_keys:
-            if k in kwargs.keys():
-                loader_kwargs[k] = kwargs.pop(k)
+        # loader_kwargs = {}
+        # tmp = inspect.signature(self.loader).bind(source, **kwargs)
+        # tmp.apply_defaults()
+        # tmp_keys = tmp.arguments.keys()
+        # for k in tmp_keys:
+        #     if k in kwargs.keys():
+        #         loader_kwargs[k] = kwargs.pop(k)
 
         super(CameraTransLoaderProcess, self).__init__(*args, **kwargs)
 
@@ -60,8 +61,16 @@ class CameraTransLoaderProcess(ProducerProcess):
 
         self.logger.info(f"Start Creating Camera Transform Loader @ "
                          f"{self.source if isinstance(self.source, str) else 'Fixed Camera'}")
-        self.logger.info(f'Waiting read @ {self.source}')
         self.loader = self.loader(self.source, **self.loader_kwargs)
+
+        t1 = time.perf_counter()
+        while not self.loader.pre_process():
+            t2 = time.perf_counter()
+            dt = t2 - t1
+            if dt >= 5:
+                self.logger.info(f'Waiting read camera transform @ {self.source}')
+                t1 = t2
+        self.logger.info(f'Finish initial read camera transform @ {self.source}')
 
     def run_action(self) -> None:
         self.logger.info("Start loading camera transform")
@@ -75,6 +84,15 @@ class CameraTransLoaderProcess(ProducerProcess):
         for timestamp, path, trans in self.loader:
             if timestamp and trans:
                 each_frame_start_time = time.perf_counter()
+
+                while hub_camera_trans.size() > self.load_buffer:
+                    if not self.opt.realtime:
+                        pass
+                    else:
+                        hub_camera_trans.get()
+                        hub_camera_trans.get()
+                        continue
+
                 self.count += 1
                 self.logger.debug(f'Read Camera Transform {self.count} from {path}')
 
@@ -88,7 +106,7 @@ class CameraTransLoaderProcess(ProducerProcess):
                 self.dps_avg = self.count / delta_time_all
                 self.dps_cur = 1 / delta_time_each
 
-                if self.count % 50 == 0 and self.count != 0:
+                if self.count % 10 == 0 and self.count != 0:
                     self.logger.info(
                         f'Reading Data count {self.count}: '
                         f'average dps: {self.dps_avg:.2f}, '

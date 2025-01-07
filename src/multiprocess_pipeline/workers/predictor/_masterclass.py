@@ -15,42 +15,38 @@ class BasePredictor:
         self.p0_list = []
         self.time_list = []
         self.predict_counter = None
-        self.predict_keeper = None
+        self.mask_keeper = None
         self.last_predict = None
 
         self.max_step = max(0, max_step)
-        self.max_distance = max(1, max_distance)
+        self.max_distance = max(0, max_distance)
 
-    def set_new_base(self, track_points: S_point) -> S_point:
-        t_current = time.perf_counter()
-
+    def set_new_base(self, track_points: S_point, t) -> S_point:
         # initial counter
         if not isinstance(self.predict_counter, np.ndarray):
             # self.p0_list[-1] += self.p0_list[-2] * self.predict_keeper
             self.predict_counter = np.where(track_points > 0, self.max_step, 0)
-            self.predict_keeper = np.zeros(track_points.shape)
+            self.mask_keeper = np.zeros(track_points.shape)
             self.last_predict = np.zeros(track_points.shape)
 
-        self.time_0 = t_current
+        self.time_0 = t
         self.p0_list.append(track_points)
-        self.time_list.append(t_current)
+        self.time_list.append(t)
 
         # Get normalized tracked and retracked, and non retracked but in keeper
-        track_normalized = np.where(track_points > 0, 1, 0)
-        retracked_predict = (track_normalized * self.predict_keeper).astype(np.int32)
-        new_tracked = track_normalized - retracked_predict
-        none_retracked_predict = (self.predict_keeper - retracked_predict).astype(np.int32)
-        self.predict_keeper = track_normalized + none_retracked_predict
-        self.p0_list[-1] += self.last_predict * none_retracked_predict  # copy keep predict
+        mask_current = np.where(track_points > 0, 1, 0)
+        mask_retracked = (mask_current * self.mask_keeper).astype(np.int32)
+        mask_new_tracked = mask_current - mask_retracked
+        mask_none_retracked = (self.mask_keeper - mask_retracked).astype(np.int32)
+        self.p0_list[-1] += self.last_predict * mask_none_retracked  # copy keep predict
 
         # Tracked results reset to max step counter
-        self.predict_counter[np.nonzero(track_normalized)] = self.max_step
+        self.predict_counter[np.nonzero(mask_current)] = self.max_step
         # None retrack counter minus 1
-        self.predict_counter -= none_retracked_predict
+        self.predict_counter -= mask_none_retracked
         # Clamp to 0
         self.predict_counter = np.where(self.predict_counter >= 0, self.predict_counter, 0)
-        mask = np.where(self.predict_counter > 0, 1, 0)
-        self.predict_keeper = self.predict_keeper * mask
+        self.mask_keeper = np.where(self.predict_counter > 0, 1, 0)
 
         return track_points
 
